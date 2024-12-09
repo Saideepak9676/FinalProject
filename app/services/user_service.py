@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from builtins import Exception, bool, classmethod, int, str
 from datetime import datetime, timezone
 import secrets
@@ -14,6 +15,7 @@ from app.utils.security import generate_verification_token, hash_password, verif
 from uuid import UUID
 from app.services.email_service import EmailService
 from app.models.user_model import UserRole
+from app.utils.validators import validate_url_safe_username
 import logging
 
 settings = get_settings()
@@ -59,32 +61,27 @@ class UserService:
                 return None
             validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
             new_user = User(**validated_data)
+            new_user.verification_token = generate_verification_token()
             new_nickname = generate_nickname()
             while await cls.get_by_nickname(session, new_nickname):
                 new_nickname = generate_nickname()
             new_user.nickname = new_nickname
-            logger.info(f"User Role: {new_user.role}")
-            user_count = await cls.count(session)
-            new_user.role = UserRole.ADMIN if user_count == 0 else UserRole.ANONYMOUS            
-            if new_user.role == UserRole.ADMIN:
-                new_user.email_verified = True
-
-            else:
-                new_user.verification_token = generate_verification_token()
-                await email_service.send_verification_email(new_user)
-
             session.add(new_user)
             await session.commit()
+            await email_service.send_verification_email(new_user)
+            
             return new_user
         except ValidationError as e:
             logger.error(f"Validation error during user creation: {e}")
             return None
 
+
+
     @classmethod
     async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str]) -> Optional[User]:
         try:
             # validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
-            validated_data = UserUpdate(**update_data).model_dump(exclude_unset=True)
+            validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
 
             if 'password' in validated_data:
                 validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
@@ -199,3 +196,14 @@ class UserService:
             await session.commit()
             return True
         return False
+    
+    @classmethod
+    async def anonymize_user(cls, session: AsyncSession, user_id: UUID):
+        user = await cls.get_by_id(session, user_id)
+        if user:
+            user.anonymize()
+            session.add(user)
+            await session.commit()
+            return user
+        return None
+
