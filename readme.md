@@ -6,6 +6,143 @@
 
 Welcome to the User Management System project - an epic open-source adventure crafted by the legendary Professor Keith Williams for his rockstar students at NJIT! 🏫👨‍🏫⭐ This project is your gateway to coding glory, providing a bulletproof foundation for a user management system that will blow your mind! 🤯 You'll bridge the gap between the realms of seasoned software pros and aspiring student developers like yourselves. 
 
+
+# Issue: Implement Robust Username Generation and Validation for Enhanced User Management            
+
+## Description:
+This section of the project implements robust username management features designed to enhance user experience and ensure data integrity. The implementation supports the automatic generation of unique, URL-safe nicknames for users during creation while allowing users to change their nicknames with validation. It enforces strict uniqueness and format constraints, ensuring compatibility with public-facing identifiers. This functionality improves user anonymity and privacy by assigning meaningful, anonymous nicknames based on a combination of words and numbers.            
+
+## Features:
+1. Username Generation:          
+
+- Randomly generate nicknames upon user creation.              
+- Use a combination of nouns, verbs, and a numeric suffix to ensure meaningful and diverse names.                  
+
+2. Nickname Uniqueness:              
+- Validate that no two users share the same nickname.               
+- Handle duplicate nickname conflicts during both user creation and updates.
+                    
+3. URL-Safe Identifier:                  
+- Ensure that nicknames are URL-safe, allowing them to be used in public contexts without encoding issues.                      
+- Only allow alphanumeric characters, underscores, and hyphens in nicknames.
+                          
+4. User-Controlled Updates:               
+- Allow users to update their nicknames, ensuring the new nickname is both valid and unique.           
+
+5. Privacy and Anonymity:                        
+- Assign anonymous nicknames by default to protect user identities.          
+- Maintain privacy by validating nicknames against strict rules.          
+
+6. Testing and Verification:                       
+- The system includes comprehensive tests to ensure correctness, with plans for additional tests to cover edge cases and rare scenarios.          
+
+## Expected Outcome                
+- Users will always have unique nicknames, either system-generated or user-updated.                        
+- Nicknames will be compliant with URL-safety standards, ensuring seamless usage in public links.                     
+- Conflicts arising from duplicate nicknames during creation or updates will be handled gracefully.                    
+- User privacy and anonymity will be safeguarded through anonymous nickname assignments.                       
+
+## Resolution Steps               
+The implementation of the nickname management and validation features involved updates to multiple components of the project, reflecting the complexity of the requirements. Below is a detailed explanation of the resolution steps and the specific changes made to each relevant file:
+
+1. app/services/user_service.py                        
+Changes Made:                   
+Nickname Validation During Creation:                     
+- Updated the create method to validate nicknames against database records.       
+- Used the generate_nickname() function to generate random nicknames and ensure uniqueness before assigning them to users.            
+- Integrated the validate_url_safe_username() function to check the format of nicknames.                      
+- Handled duplicate nickname errors gracefully with proper logging and error messages.                       
+
+Nickname Validation During Updates:               
+- Updated the update method to enforce uniqueness for nicknames during updates.                                 
+- Validated that nicknames meet URL-safety standards before saving changes.       
+
+Purpose: Ensure that all nicknames are unique, valid, and compliant with URL-safe standards during user creation and updates.              
+
+2. tests/test_api/test_users_api.py            
+Changes Made:             
+Test for Duplicate Nickname Creation:
+- Added test_create_user_duplicate_nickname to ensure that creating a user with a duplicate nickname fails.                 
+- Mocked external email service to focus on nickname validation logic.      
+
+Test for Duplicate Nickname Updates:                          
+- Added test_update_user_duplicate_nickname to validate that nickname updates with duplicates are rejected.               
+- Used the test client to simulate API calls for creation and updates.          
+Purpose: Verify that the API layer correctly handles nickname uniqueness and format validation.            
+
+3. tests/test_services/test_user_service.py              
+Changes Made:             
+Test for Nickname Creation:           
+- Added tests to ensure that generated nicknames are unique and comply with URL-safety rules.             
+- Mocked email service to isolate the nickname generation and validation logic.                
+
+Test for Duplicate Nickname Handling:               
+- Added test_create_user_duplicate_nickname and test_update_user_duplicate_nickname to validate service-layer logic for handling duplicates.                 
+
+Purpose: Test the internal service logic to ensure correctness and coverage of nickname generation and validation features.                  
+
+4. app/utils/nickname_gen.py                
+Changes Made:                  
+- Implemented the generate_nickname() function to generate random combinations of nouns, verbs, and numbers.                
+- Added utility functions to validate the format and uniqueness of nicknames.                  
+
+- Purpose: Provide a reusable utility to create meaningful and unique nicknames while adhering to project constraints.            
+
+5. app/utils/validators.py          
+Changes Made:           
+- Added the validate_url_safe_username() function to enforce URL-safe standards for nicknames.               
+
+Purpose: Ensure that nicknames can safely be used as public-facing identifiers in URLs without encoding issues.            
+
+6. tests/conftest.py              
+Changes Made:              
+- Added new test fixtures to create mock users with unique nicknames for testing.                
+- Introduced an admin_user and manager_user fixture for role-based testing of API endpoints.                
+
+Purpose: Facilitate testing of nickname uniqueness and validation in both API and service layers.               
+
+7. app/models/user_model.py            
+Changes Made:           
+- Updated the User model to enforce uniqueness constraints on the nickname field at the database level.             
+
+Purpose: Add an additional layer of protection against duplicate nicknames, even in concurrent user creation scenarios.             
+
+## Test
+Overview
+This section outlines the tests implemented to verify the functionalities related to Username Generation and Validation. These tests ensure that the following features are correctly implemented and functional:             
+
+- Username Generation: Automatically generates a random, unique username combining nouns, verbs, and numbers.            
+- Uniqueness: Validates that usernames are unique during creation and updates.              
+- Validation: Ensures usernames are URL-safe and adhere to format constraints.               
+- User Privacy and Anonymity: Keeps usernames secure and private.           
+- Edge Case Handling: Handles invalid data gracefully.              
+
+Pytest
+
+1. API Tests
+File: tests/test_api/test_users_api.py          
+
+Key Tests:          
+- test_create_user_duplicate_nickname: Verifies that creating a user with a duplicate nickname fails.             
+- test_update_user_duplicate_nickname: Ensures that updating a user to have a duplicate nickname fails.             
+- test_create_user_invalid_data: Tests that invalid data (e.g., missing required fields) is handled properly.             
+
+
+2. Service Tests              
+File: tests/test_services/test_user_service.py          
+
+Key Tests:             
+- test_create_user_with_valid_data: Ensures valid user data creates a user successfully.                  
+- test_create_user_duplicate_email: Confirms duplicate email detection and rejection.               
+- test_update_user_duplicate_nickname: Validates that updating to a duplicate nickname is disallowed.                      
+- test_update_user_invalid_data: Checks handling of invalid user update data.                     
+
+![Test Output](images/test_users_api_readme.jpg)
+
+![Test for User Service](images/test_user_service_readme.jpg)
+
+
+
 ### [Instructor Video - Project Overview and Tips](https://youtu.be/gairLNAp6mA) 🎥
 
 - [Introduction to the system features and overview of the project - please read](system_documentation.md) 📚
