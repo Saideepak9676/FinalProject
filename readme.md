@@ -137,9 +137,12 @@ Key Tests:
 - test_update_user_duplicate_nickname: Validates that updating to a duplicate nickname is disallowed.                      
 - test_update_user_invalid_data: Checks handling of invalid user update data.                     
 
-![Test Output](images/test_users_api_readme.jpg)
+### Test Results for API Tests
+![Test API Results](images/test_api_readme.jpg)
 
-![Test for User Service](images/test_user_service_readme.jpg)
+### Test Results for User Service Tests
+![Test User Service Results](images/user_service_readme.jpg)
+
 
 
 
