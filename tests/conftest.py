@@ -238,3 +238,23 @@ def email_service():
         mock_service.send_verification_email.return_value = None
         mock_service.send_user_email.return_value = None
         return mock_service
+
+import pytest
+from app.models.user_model import User
+from app.utils.nickname_gen import generate_nickname
+
+@pytest.fixture
+async def another_user(db_session):
+    """
+    Create a secondary user with a unique nickname and email for testing.
+    """
+    user = User(
+        nickname=generate_nickname(),
+        email="another_user@example.com",
+        hashed_password="hashedpassword",
+        role="AUTHENTICATED"
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
