@@ -8,6 +8,9 @@ from app.utils.security import hash_password
 from app.services.jwt_service import decode_token  # Import your FastAPI app
 from pydantic import ValidationError  # Import ValidationError
 from app.services.user_service import UserService  # Import UserService
+from unittest.mock import AsyncMock, patch
+from fastapi import HTTPException
+
 
 # Example of a test function using the async_client fixture
 @pytest.mark.asyncio
@@ -253,3 +256,51 @@ async def test_register_user_with_invalid_data(async_client):
     }
     response = await async_client.post("/register/", json=user_data)
     assert response.status_code == 422
+
+@pytest.mark.asyncio
+async def test_update_user_duplicate_nickname(async_client, admin_token, user, another_user):
+    """
+    Test that updating a user with a duplicate nickname fails.
+    """
+    headers = {"Authorization": f"Bearer {admin_token}"}  # Use admin token
+    update_data = {"nickname": another_user.nickname}  # Duplicate nickname
+    response = await async_client.put(f"/users/{user.id}", json=update_data, headers=headers)
+    
+    # Assert response status and detail
+    assert response.status_code == 400
+    assert "Nickname already exists" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_user_duplicate_nickname(db_session, user):
+    # Mock the email service
+    mock_email_service = AsyncMock()
+    mock_email_service.send_verification_email.return_value = None
+
+    # Duplicate user data
+    user_data = {
+        "nickname": user.nickname,  # Duplicate nickname
+        "email": "duplicate@example.com",
+        "password": "ValidPassword123!",
+        "role": "AUTHENTICATED",
+    }
+
+    # Attempt to create a user with a duplicate nickname
+    new_user = await UserService.create(db_session, user_data, mock_email_service)
+
+    # If a user is returned, assert it matches the expected behavior
+    if new_user:
+        assert new_user.nickname != user.nickname, "Nickname should be unique"
+    else:
+        # Assert that user creation failed due to duplicate nickname
+        assert new_user is None, "User creation should fail for duplicate nickname"
+
+
+
+
+
+
+
+
+
+
