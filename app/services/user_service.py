@@ -16,6 +16,7 @@ from uuid import UUID
 from app.services.email_service import EmailService
 from app.models.user_model import UserRole
 from app.utils.validators import validate_url_safe_username
+from sqlalchemy.exc import IntegrityError
 import logging
 
 settings = get_settings()
@@ -80,25 +81,48 @@ class UserService:
     @classmethod
     async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str]) -> Optional[User]:
         try:
-            # validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
+            # Validate incoming data using UserUpdate schema
             validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
 
+            # Handle password updates
             if 'password' in validated_data:
-                validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
-            query = update(User).where(User.id == user_id).values(**validated_data).execution_options(synchronize_session="fetch")
+               validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
+
+            # Handle nickname updates
+            if 'nickname' in validated_data:
+             existing_user = await cls.get_by_nickname(session, validated_data['nickname'])
+             if existing_user and existing_user.id != user_id:
+                 logger.error(f"Nickname '{validated_data['nickname']}' already exists.")
+                 raise HTTPException(status_code=400, detail="Nickname already exists.")
+
+            # Execute the update query
+            query = (
+            update(User)
+            .where(User.id == user_id)
+            .values(**validated_data)
+            .execution_options(synchronize_session="fetch")
+            )
             await cls._execute_query(session, query)
+
+            # Fetch and return the updated user
             updated_user = await cls.get_by_id(session, user_id)
             if updated_user:
-                session.refresh(updated_user)  # Explicitly refresh the updated user object
-                logger.info(f"User {user_id} updated successfully.")
-                return updated_user
+             session.refresh(updated_user)
+             logger.info(f"User {user_id} updated successfully.")
+             return updated_user
             else:
                 logger.error(f"User {user_id} not found after update attempt.")
-            return None
-        except Exception as e:  # Broad exception handling for debugging
-            logger.error(f"Error during user update: {e}")
-            return None
-
+                raise HTTPException(status_code=404, detail="User not found.")
+        except ValidationError as ve:
+            logger.error(f"Validation error during user update: {ve}")
+            raise HTTPException(status_code=422, detail=str(ve))
+        except HTTPException as he:
+            logger.error(f"HTTPException during user update: {he.detail}")
+            raise he
+        except Exception as e:
+            logger.error(f"Unexpected error during user update: {e}")
+            raise HTTPException(status_code=500, detail="An unexpected error occurred during user update.")
+        
     @classmethod
     async def delete(cls, session: AsyncSession, user_id: UUID) -> bool:
         user = await cls.get_by_id(session, user_id)
