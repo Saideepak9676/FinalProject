@@ -2,6 +2,7 @@ from builtins import bool, int, str
 from datetime import datetime
 from enum import Enum
 import uuid
+import random
 from sqlalchemy import (
     Column, String, Integer, DateTime, Boolean, func, Enum as SQLAlchemyEnum
 )
@@ -95,3 +96,6 @@ class User(Base):
         """Updates the professional status and logs the update time."""
         self.is_professional = status
         self.professional_status_updated_at = func.now()
+
+    def anonymize(self):
+        self.nickname = f"Anonymous{random.randint(1, 9999)}"

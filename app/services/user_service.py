@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from builtins import Exception, bool, classmethod, int, str
 from datetime import datetime, timezone
 import secrets
@@ -14,7 +15,10 @@ from app.utils.security import generate_verification_token, hash_password, verif
 from uuid import UUID
 from app.services.email_service import EmailService
 from app.models.user_model import UserRole
+from app.utils.validators import validate_url_safe_username
+from sqlalchemy.exc import IntegrityError
 import logging
+from typing import List, Tuple 
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -59,49 +63,67 @@ class UserService:
                 return None
             validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
             new_user = User(**validated_data)
+            new_user.verification_token = generate_verification_token()
             new_nickname = generate_nickname()
             while await cls.get_by_nickname(session, new_nickname):
                 new_nickname = generate_nickname()
             new_user.nickname = new_nickname
-            logger.info(f"User Role: {new_user.role}")
-            user_count = await cls.count(session)
-            new_user.role = UserRole.ADMIN if user_count == 0 else UserRole.ANONYMOUS            
-            if new_user.role == UserRole.ADMIN:
-                new_user.email_verified = True
-
-            else:
-                new_user.verification_token = generate_verification_token()
-                await email_service.send_verification_email(new_user)
-
             session.add(new_user)
             await session.commit()
+            await email_service.send_verification_email(new_user)
+            
             return new_user
         except ValidationError as e:
             logger.error(f"Validation error during user creation: {e}")
             return None
 
+
+
     @classmethod
     async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str]) -> Optional[User]:
         try:
-            # validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
-            validated_data = UserUpdate(**update_data).model_dump(exclude_unset=True)
+            # Validate incoming data using UserUpdate schema
+            validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
 
+            # Handle password updates
             if 'password' in validated_data:
-                validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
-            query = update(User).where(User.id == user_id).values(**validated_data).execution_options(synchronize_session="fetch")
+               validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
+
+            # Handle nickname updates
+            if 'nickname' in validated_data:
+             existing_user = await cls.get_by_nickname(session, validated_data['nickname'])
+             if existing_user and existing_user.id != user_id:
+                 logger.error(f"Nickname '{validated_data['nickname']}' already exists.")
+                 raise HTTPException(status_code=400, detail="Nickname already exists.")
+
+            # Execute the update query
+            query = (
+            update(User)
+            .where(User.id == user_id)
+            .values(**validated_data)
+            .execution_options(synchronize_session="fetch")
+            )
             await cls._execute_query(session, query)
+
+            # Fetch and return the updated user
             updated_user = await cls.get_by_id(session, user_id)
             if updated_user:
-                session.refresh(updated_user)  # Explicitly refresh the updated user object
-                logger.info(f"User {user_id} updated successfully.")
-                return updated_user
+             session.refresh(updated_user)
+             logger.info(f"User {user_id} updated successfully.")
+             return updated_user
             else:
                 logger.error(f"User {user_id} not found after update attempt.")
-            return None
-        except Exception as e:  # Broad exception handling for debugging
-            logger.error(f"Error during user update: {e}")
-            return None
-
+                raise HTTPException(status_code=404, detail="User not found.")
+        except ValidationError as ve:
+            logger.error(f"Validation error during user update: {ve}")
+            raise HTTPException(status_code=422, detail=str(ve))
+        except HTTPException as he:
+            logger.error(f"HTTPException during user update: {he.detail}")
+            raise he
+        except Exception as e:
+            logger.error(f"Unexpected error during user update: {e}")
+            raise HTTPException(status_code=500, detail="An unexpected error occurred during user update.")
+        
     @classmethod
     async def delete(cls, session: AsyncSession, user_id: UUID) -> bool:
         user = await cls.get_by_id(session, user_id)
@@ -199,3 +221,59 @@ class UserService:
             await session.commit()
             return True
         return False
+    
+    @classmethod
+    async def anonymize_user(cls, session: AsyncSession, user_id: UUID):
+        user = await cls.get_by_id(session, user_id)
+        if user:
+            user.anonymize()
+            session.add(user)
+            await session.commit()
+            return user
+        return None
+
+
+    @staticmethod
+    async def search_and_filter_users(
+        session: AsyncSession, 
+        filters: Dict[str, Optional[str]], 
+        skip: int, 
+        limit: int
+    ) -> Tuple[List[User], int]:
+        """
+        Search and filter users based on the given criteria.
+
+        :param session: AsyncSession for database access.
+        :param filters: Dictionary of search and filter criteria.
+        :param skip: Pagination offset.
+        :param limit: Number of records to return.
+        :return: A tuple containing the list of users and total count.
+        """
+        query = select(User)
+
+        # Apply filters
+        if filters.get("username"):
+            query = query.filter(User.nickname.ilike(f"%{filters['username']}%"))
+        if filters.get("email"):
+            query = query.filter(User.email.ilike(f"%{filters['email']}%"))
+        if filters.get("role"):
+            query = query.filter(User.role == filters["role"])
+        if filters.get("account_status") is not None:
+            query = query.filter(User.email_verified == filters["account_status"])
+        if filters.get("registration_date_start") and filters.get("registration_date_end"):
+            query = query.filter(
+                User.created_at.between(filters["registration_date_start"], filters["registration_date_end"])
+            )
+
+        # Add pagination
+        query = query.offset(skip).limit(limit)
+
+        # Execute the query and count total users
+        result = await session.execute(query)
+        users = result.scalars().all()
+
+        total_query = select(func.count()).select_from(User)
+        total_result = await session.execute(total_query)
+        total_users = total_result.scalar()
+
+        return users, total_users

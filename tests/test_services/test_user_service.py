@@ -1,10 +1,13 @@
 from builtins import range
 import pytest
+from fastapi.exceptions import HTTPException
 from sqlalchemy import select
 from app.dependencies import get_settings
 from app.models.user_model import User, UserRole
 from app.services.user_service import UserService
 from app.utils.nickname_gen import generate_nickname
+from datetime import datetime
+
 
 pytestmark = pytest.mark.asyncio
 
@@ -61,17 +64,23 @@ async def test_get_by_email_user_does_not_exist(db_session):
     retrieved_user = await UserService.get_by_email(db_session, "non_existent_email@example.com")
     assert retrieved_user is None
 
-# Test updating a user with valid data
+@pytest.mark.asyncio
 async def test_update_user_valid_data(db_session, user):
     new_email = "updated_email@example.com"
     updated_user = await UserService.update(db_session, user.id, {"email": new_email})
     assert updated_user is not None
     assert updated_user.email == new_email
 
-# Test updating a user with invalid data
+@pytest.mark.asyncio
 async def test_update_user_invalid_data(db_session, user):
-    updated_user = await UserService.update(db_session, user.id, {"email": "invalidemail"})
-    assert updated_user is None
+    with pytest.raises(HTTPException) as exc_info:
+        await UserService.update(db_session, user.id, {"email": "invalidemail"})
+    
+    assert exc_info.value.status_code == 422
+    assert "value is not a valid email address" in str(exc_info.value.detail)
+
+
+
 
 # Test deleting a user who exists
 async def test_delete_user_exists(db_session, user):
@@ -161,3 +170,50 @@ async def test_unlock_user_account(db_session, locked_user):
     assert unlocked, "The account should be unlocked"
     refreshed_user = await UserService.get_by_id(db_session, locked_user.id)
     assert not refreshed_user.is_locked, "The user should no longer be locked"
+
+async def test_random_username_generation(db_session):
+    nickname = generate_nickname()
+    assert nickname is not None
+
+
+@pytest.mark.asyncio
+async def test_update_user_duplicate_nickname(db_session, user, another_user):
+    # Ensure we have two users with distinct nicknames
+    assert user.nickname != another_user.nickname
+
+    # Attempt to update the second user's nickname to match the first user's nickname
+    duplicate_nickname = user.nickname
+    with pytest.raises(HTTPException) as exc_info:
+        await UserService.update(db_session, another_user.id, {"nickname": duplicate_nickname})
+
+    # Validate the raised HTTPException
+    assert exc_info.value.status_code == 400
+    assert "Nickname already exists" in str(exc_info.value.detail)
+
+
+
+# Test creating a user with duplicate email
+@pytest.mark.asyncio
+async def test_create_user_with_duplicate_email(db_session, email_service, user):
+    user_data = {
+        "email": user.email,  # Duplicate email
+        "nickname": generate_nickname(),
+        "password": "StrongPassword123!",
+        "role": "AUTHENTICATED",
+    }
+    duplicate_user = await UserService.create(db_session, user_data, email_service)
+    assert duplicate_user is None, "User with duplicate email should not be created."
+    
+    # Test updating a user with duplicate nickname
+@pytest.mark.asyncio
+async def test_update_user_duplicate_nickname(db_session, user, another_user):
+    # Attempt to update the second user's nickname to match the first user's nickname
+    duplicate_nickname = user.nickname
+    with pytest.raises(HTTPException) as exc_info:
+        await UserService.update(db_session, another_user.id, {"nickname": duplicate_nickname})
+
+    # Validate the raised HTTPException
+    assert exc_info.value.status_code == 400
+    assert "Nickname already exists" in str(exc_info.value.detail)
+
+

@@ -37,22 +37,35 @@ class UserCreate(UserBase):
     email: EmailStr = Field(..., example="john.doe@example.com")
     password: str = Field(..., example="Secure*1234")
 
-class UserUpdate(UserBase):
+from typing import Optional
+from pydantic import BaseModel, Field, EmailStr, root_validator
+
+class UserUpdate(BaseModel):
     email: Optional[EmailStr] = Field(None, example="john.doe@example.com")
-    nickname: Optional[str] = Field(None, min_length=3, pattern=r'^[\w-]+$', example="john_doe123")
+    nickname: Optional[str] = Field(
+        None, 
+        min_length=3, 
+        max_length=50,  # Add a maximum length
+        pattern=r'^[\w-]+$',  # URL-safe: allows alphanumeric, underscores, and hyphens
+        example="john_doe123"
+    )
     first_name: Optional[str] = Field(None, example="John")
     last_name: Optional[str] = Field(None, example="Doe")
     bio: Optional[str] = Field(None, example="Experienced software developer specializing in web applications.")
     profile_picture_url: Optional[str] = Field(None, example="https://example.com/profiles/john.jpg")
-    linkedin_profile_url: Optional[str] =Field(None, example="https://linkedin.com/in/johndoe")
+    linkedin_profile_url: Optional[str] = Field(None, example="https://linkedin.com/in/johndoe")
     github_profile_url: Optional[str] = Field(None, example="https://github.com/johndoe")
     role: Optional[str] = Field(None, example="AUTHENTICATED")
 
     @root_validator(pre=True)
     def check_at_least_one_value(cls, values):
+        """
+        Ensure at least one field is provided for update.
+        """
         if not any(values.values()):
-            raise ValueError("At least one field must be provided for update")
+            raise ValueError("At least one field must be provided for update.")
         return values
+
 
 class UserResponse(UserBase):
     id: uuid.UUID = Field(..., example=uuid.uuid4())
@@ -81,3 +94,12 @@ class UserListResponse(BaseModel):
     total: int = Field(..., example=100)
     page: int = Field(..., example=1)
     size: int = Field(..., example=10)
+
+
+class UserSearchParams(BaseModel):
+    username: Optional[str] = Field(None, example="john_doe")
+    email: Optional[EmailStr] = Field(None, example="john.doe@example.com")
+    role: Optional[UserRole] = Field(None, example="ADMIN")
+    account_status: Optional[bool] = Field(None, example=True)
+    registration_date_start: Optional[datetime] = Field(None, example="2023-01-01T00:00:00Z")
+    registration_date_end: Optional[datetime] = Field(None, example="2023-12-31T23:59:59Z")
