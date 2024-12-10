@@ -81,14 +81,21 @@ async def test_filter_users_case_insensitive(db_session, users_with_same_role_50
     """
     Test case-insensitive filtering for username and email.
     """
-    filters_username = {"username": users_with_same_role_50_users[0].nickname.upper()}
-    users_by_username, _ = await UserService.search_and_filter_users(db_session, filters_username, 0, 10)
-    
-    assert len(users_by_username) == 1, "Case-insensitive username filter should match one user"
-    assert users_by_username[0].nickname == users_with_same_role_50_users[0].nickname
+    # Ensure the first user has a unique nickname and email
+    first_user = users_with_same_role_50_users[0]
+    assert all(
+        user.nickname != first_user.nickname or user.email != first_user.email
+        for user in users_with_same_role_50_users[1:]
+    ), "The first user's nickname or email must be unique."
 
-    filters_email = {"email": users_with_same_role_50_users[0].email.upper()}
+    # Test case-insensitive username filtering
+    filters_username = {"username": first_user.nickname.upper()}
+    users_by_username, _ = await UserService.search_and_filter_users(db_session, filters_username, 0, 10)
+    assert len(users_by_username) == 1, "Case-insensitive username filter should match one user"
+    assert users_by_username[0].nickname == first_user.nickname
+
+    # Test case-insensitive email filtering
+    filters_email = {"email": first_user.email.upper()}
     users_by_email, _ = await UserService.search_and_filter_users(db_session, filters_email, 0, 10)
-    
     assert len(users_by_email) == 1, "Case-insensitive email filter should match one user"
-    assert users_by_email[0].email == users_with_same_role_50_users[0].email
+    assert users_by_email[0].email == first_user.email
