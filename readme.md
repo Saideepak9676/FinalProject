@@ -545,4 +545,339 @@ The above updates comprehensively implement the feature, meeting all requirement
 
 
 
+# Tests for User Search and Filtering Feature      
+## Overview         
+The user search and filtering functionality is tested extensively to ensure it meets the defined requirements and behaves as expected under various conditions. These tests validate the API endpoint, service layer, pagination, and filtering mechanisms. Below is a detailed explanation of each test and its purpose.              
+
+1. ## test_empty_filters_api     
+
+- Purpose:      
+Tests the behavior of the API when no filters are provided.            
+- Description:         
+Simulates an API call with no query parameters. This validates the default behavior of returning all users with pagination applied.             
+- Expected Outcome:         
+The API should return the default list of users paginated according to the specified limit and skip values.           
+- Importance:          
+Ensures that the endpoint works even without filters and that pagination is correctly applied by default.          
+
+2. # test_search_users_api          
+
+- Purpose:         
+Validates the core functionality of searching for users based on specific criteria like username, role, and account status.         
+- Description:           
+Sends a request with valid search filters and verifies that the API correctly filters the users.           
+- Expected Outcome:           
+Only users matching the specified filters should be returned.             
+- Importance:            
+Verifies that the API handles search parameters correctly and filters the user list as expected.             
+
+3. # test_combination_of_filters:
+
+- Purpose:
+Ensures that multiple filters applied together work correctly.         
+- Description:          
+Combines filters like username, role, and account status in a single request and verifies the response.          
+- Expected Outcome:  Only users matching all specified filters should be returned.       
+- Importance:        
+Validates the API's ability to handle complex queries with multiple filters applied simultaneously.        
+4. # test_filter_users_by_email        
+
+- Purpose:          
+Tests filtering users based on their email addresses.         
+- Description:     
+Sends a request with an email filter to ensure the API correctly returns users matching the email criteria.        
+- Expected Outcome:        
+Users with the specified email should be returned, and no additional users should be included.           
+- Importance:       
+Verifies that the API accurately handles email-based filters.         
+
+5. # test_filter_users_by_registration_date   
+
+- Purpose:       
+Validates filtering users based on their registration date range.      
+- Description:         
+Uses registration_date_start and registration_date_end to filter users registered within a specific date range.      
+- Expected Outcome:        
+Only users who registered within the specified range should be included in the response.         
+- Importance:          
+Ensures that the API supports date-based filtering and that the implementation is accurate.         
+
+6. # test_filter_users_by_account_status     
+
+- Purpose:      
+Tests filtering users based on their account status (e.g., verified or unverified).      
+- Description:        
+Filters users based on their account verification status and validates the API response.       
+- Expected Outcome:       
+The response should only include users with the specified account status.        
+- Importance:       
+Verifies that account status filtering is functioning correctly.       
+
+7. # test_filter_users_by_role       
+ 
+ - Purpose:         
+ Ensures users can be filtered based on their role (e.g., ADMIN, USER, MANAGER).      
+ - Description:      
+ Sends a request with a role filter and validates the response.       
+ - Expected Outcome:      
+ The API should return only users with the specified role.       
+ - Importance:       
+ Confirms that role-based filtering works as expected.         
+
+ 8. # test_search_users_by_username        
+
+ - Purpose:      
+ Validates searching for users by their username.        
+ - Description:        
+ Tests the username search filter to ensure partial matches (using ilike) return the correct users.        
+ - Expected Outcome:      
+ Users whose usernames match the search string (partially or fully) should be returned.       
+ - Importance:       
+ Ensures that username-based search functionality is accurate.       
+
+ 9. # test_generate_pagination_links       
+
+ - Purpose:        
+ Tests the generate_pagination_links helper function.      
+ - Description:       
+ Verifies that the pagination links for next, prev, first, and last pages are generated correctly based on the total number of users and the current offset.        
+ - Expected Outcome:      
+ Correct pagination links should be returned for various scenarios.       
+ - Importance:        
+ Validates the correctness of pagination link generation, ensuring smooth navigation across pages.         
+
+ 10. # test_pagination_boundary       
+
+ - Purpose:       
+ Ensures the API handles edge cases for pagination correctly.       
+ - Description:       
+ Tests scenarios like requesting a page beyond the total number of users or when the number of users is less than the page size.        
+ - Expected Outcome:        
+ The API should handle these scenarios gracefully without errors and return appropriate results (e.g., an empty list for out-of-bound pages).         
+ - Importance:        
+ Validates that pagination edge cases are handled correctly, ensuring a robust implementation.         
+
+11. # test_filter_users_case_insensitive      
+
+- purpose:         
+Verify Case-Insensitive Filtering of Users       
+- Description       
+The purpose of this test is to ensure that the user search and filtering functionality works correctly regardless of the case of the input provided. User data in the database might have mixed-case values, but administrators or users should be able to search for them without worrying about capitalization. This test verifies that the filtering mechanism is case-insensitive for key fields such as usernames, emails, and roles.       
+- Expected Outcome:       
+The system should match and return user data even when the case of the search query does not exactly match the case stored in the database.          
+- Test Scenario:       
+1. A database is preloaded with mock user data that includes usernames, emails, and roles in mixed cases.         
+2. The test performs searches using different cases (e.g., all lowercase, all uppercase, mixed case) for:       
+- Usernames      
+- Emails       
+- Roles         
+The test validates that the correct user records are returned regardless of the case of the search query.       
+- Test Steps:        
+- Define filters with varying cases for username, email, and role.          
+- Call the search_and_filter_users service with these filters.          
+- Assert that the returned results match the expected users, confirming case-insensitive behavior.            
+
+- Results:         
+- If the test passes, it confirms that the filtering logic is case-insensitive.       
+- If the test fails, it indicates that the service or database query needs to be updated to handle case-insensitive comparisons correctly.              
+
+- Why It’s Important:           
+ This test ensures that the application is user-friendly and robust. Users might not always input the exact case when searching for data, and failing to account for this could result in missed results or user frustration. Implementing and validating case-insensitivity improves usability and avoids such pitfalls.        
+
+ 12. # test_fetch_all_users       
+ - purpose:       
+ Verify Fetching All Users Without Filters.    
+ - Expected Outcome:       
+- The API should return a list of users with proper pagination when no filters are applied.        
+- The response should include the total count of users and an array of user items.      
+- Test Scenario:          
+1. The test sends a GET request to the /users endpoint without any filters, specifying only basic pagination parameters (skip and limit).        
+2. It verifies that the response:        
+- Has a status code of 200 OK.        
+- Contains a key called items representing the list of users.          
+- Contains a key called total representing the total number of users in the system.      
+- Ensures that items is a list.        
+- Test Steps:         
+1. Set up the required authorization headers using an admin token.          
+2. Specify basic pagination parameters (skip and limit).           
+3. Send a GET request to the /users endpoint with these parameters.         
+3. Validate the response by asserting:
+The status code is 200.          
+4. The response includes the items key, and it contains a list.            
+5. The total key exists and is a non-negative integer.         
+- Results:          
+If the test passes:         
+- It confirms that the /users endpoint     correctly handles requests without filters.      
+- It ensures that the response includes essential data such as the list of users and the total user count.         
+If the test fails:      
+- It indicates an issue with the endpoint's ability to fetch unfiltered user data or manage pagination.                 
+- Why It’s Important:            
+ This test validates the core functionality of the /users endpoint. Being able to fetch all users without filters is a fundamental feature that administrators rely on for user management. Ensuring the API can handle this scenario correctly, including providing accurate pagination details, is critical for usability and reliability.         
+
+ 13. # test_pagination_edge_cases      
+ - purpose:        
+ Verify Pagination Utility Handles Edge Cases        
+ - Description:          
+  This test ensures that the pagination utility (generate_pagination_links) handles edge cases correctly. It validates the behavior of pagination links under specific conditions, ensuring the utility functions as expected in less common scenarios.      
+  - Expected Outcome:             
+1. The utility should correctly calculate pagination links when the total number of items is less than the specified limit.       
+2. The utility should generate correct links when the total number of items is an exact multiple of the limit.               
+- Test Scenario:           
+1. Case 1: Total items are fewer than the pagination limit.            
+- There should be no "next" or "previous" links because all items fit on the first page.           
+2. Case 2: Total items are an exact multiple of the pagination limit.              
+- The "last" link should correctly point to the last page, ensuring accurate boundary handling.          
+- Test Steps:          
+ 1. Setup: Create a mock request object simulating the API's base URL and query parameters.                  
+2. Case 1:
+- Generate pagination links with a total number of items less than the limit.       
+- Verify that "next" and "prev" links are None.                
+3. Case 2:
+- Generate pagination links with the total number of items being a multiple of the limit.           
+- Verify that the "last" link points to the last page with the correct skip and limit parameters.       
+- Results:        
+If the test passes:        
+It confirms that the pagination utility correctly handles edge cases, ensuring accurate and reliable pagination links.      
+If the test fails:          
+It indicates issues in the pagination utility, particularly in handling edge scenarios like small datasets or perfectly divisible totals.        
+- Why It’s Important:           
+Pagination is essential for efficiently navigating large datasets. Edge cases like small datasets or exact multiples of the limit can expose hidden bugs in the pagination logic. This test ensures the utility can handle such scenarios gracefully, providing a consistent user experience.     
+
+14. # test_search_users_pagination       
+- purpose:      
+ Verifies that the API correctly applies pagination when fetching users.       
+ - Description:          
+1. This test validates the proper implementation of pagination functionality in the /users API endpoint. It ensures that:           
+- The endpoint correctly returns a subset of users based on the skip and limit parameters.        
+- The pagination system is working as expected by retrieving different pages of results.       
+- Steps Taken:       
+1. Headers Setup: The test sets up the Authorization headers with an admin token to access the endpoint.             
+2. First Page Test:          
+- It sends a request to fetch the first page of users with a skip of 0 and a limit of 5.        
+- The test validates that the response returns exactly 5 users and that these users are in the expected range.         
+- Second Page Test:         
+It sends another request to fetch the next page with a skip of 5 and the same limit of 5.           
+The test ensures that the results are different from the first page and validates the count.          
+- Expected Outcomes:           
+1. The /users endpoint returns users in chunks based on the skip and limit values.      
+- The total number of items in the first page matches the limit.         
+- The second page results do not overlap with the first page.            
+- The test ensures the total key in the response correctly reflects the total count of users in the database.           
+- What This Test Verifies:         
+1. The endpoint handles skip and limit parameters correctly.         
+2. Pagination works seamlessly and doesn't repeat or omit records between pages.         
+3. The API provides accurate metadata about the total number of users.            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Why These Tests Are Important       
+- Coverage: These tests collectively ensure that all aspects of user search, filtering, and pagination are thoroughly validated.      
+- Error Handling: They confirm the API can gracefully handle invalid inputs and edge cases.            
+- Reliability: Ensures the API behaves predictably under different conditions and filters.               
+- Scalability: Validates pagination to handle large datasets effectively.           
+
+## Results and Learnings          
+From these tests, we verify:         
+- The API filters users accurately based on the specified criteria.           
+- Pagination works seamlessly, even at boundaries or edge cases.            
+- The implementation adheres to the feature requirements, supporting all necessary filters and use cases.            
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
