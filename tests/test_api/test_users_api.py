@@ -10,6 +10,8 @@ from pydantic import ValidationError  # Import ValidationError
 from app.services.user_service import UserService  # Import UserService
 from unittest.mock import AsyncMock, patch
 from fastapi import HTTPException
+import json
+from urllib.parse import urlencode
 
 
 # Example of a test function using the async_client fixture
@@ -298,9 +300,36 @@ async def test_create_user_duplicate_nickname(db_session, user):
 
 
 
+@pytest.mark.asyncio
+async def test_search_users_api(async_client, admin_token):
+    """
+    Test the `/users` endpoint with valid parameters.
+    """
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    query_params = {
+        "username": "john",
+        "role": "ADMIN",
+        "account_status": True,  # Boolean passed as expected by the API
+    }
 
+    response = await async_client.get(
+        f"/users?{urlencode(query_params)}",
+        headers=headers
+    )
 
+    # Debugging block to capture details in case of failure
+    if response.status_code != 200:
+        print(f"Response status: {response.status_code}")
+        print(f"Response headers: {response.headers}")
+        try:
+            print(f"Response content: {response.json()}")
+        except Exception as e:
+            print(f"Failed to parse JSON response: {e}")
 
+    assert response.status_code == 200, f"Expected status 200 but got {response.status_code}"
 
-
-
+    data = response.json()
+    assert "items" in data, "Response should include 'items' key"
+    assert isinstance(data["items"], list), "'items' should be a list"
+    assert all("nickname" in user for user in data["items"]), "Each user should have a 'nickname'"
+    assert all("email" in user for user in data["items"]), "Each user should have an 'email'"
