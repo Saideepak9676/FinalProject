@@ -146,48 +146,403 @@ Key Tests:
 
 
 
-### [Instructor Video - Project Overview and Tips](https://youtu.be/gairLNAp6mA) 🎥
 
-- [Introduction to the system features and overview of the project - please read](system_documentation.md) 📚
-- [Project Setup Instructions](setup.md) ⚒️
-- [Features to Select From](features.md) 🛠️
-- [About the Project](about.md)🔥🌟
 
-## Goals and Objectives: Unlock Your Coding Superpowers 🎯🏆🌟
+# Feature: Search and Filtering Capabilities for User Management           
+## Description:        
+This feature enables administrators to search and filter users based on various criteria, such as username, email, role, account status, and registration date range. It supports pagination for easier navigation through large datasets.              
 
-Get ready to ascend to new heights with this legendary project:
+## User Story:       
+As an administrator, I want to be able to:           
 
-1. **Practical Experience**: Dive headfirst into a real-world codebase, collaborate with your teammates, and contribute to an open-source project like a seasoned pro! 💻👩‍💻🔥
-2. **Quality Assurance**: Develop ninja-level skills in identifying and resolving bugs, ensuring your code quality and reliability are out of this world. 🐞🔍⚡
-3. **Test Coverage**: Write additional tests to cover edge cases, error scenarios, and important functionalities - leave no stone unturned and no bug left behind! ✅🧪🕵️‍♂️
-4. **Feature Implementation**: Implement a brand new, mind-blowing feature and make your epic mark on the project, following best practices for coding, testing, and documentation like a true artisan. ✨🚀🎆
-5. **Collaboration**: Foster teamwork and collaboration through code reviews, issue tracking, and adhering to contribution guidelines - teamwork makes the dream work, and together you'll conquer worlds! 🤝💪🌍
-6. **Industry Readiness**: Prepare for the software industry by working on a project that simulates real-world development scenarios - level up your skills to super hero status  and become an unstoppable coding force! 🔝🚀🏆⚡
+1. Search for users by username, email, or role.          
+2. Filter users based on account status or registration date range.        
+3. Navigate through filtered results using pagination.         
 
-## Submission and Grading: Your Chance to Shine 📝✏️📈
+## Viable Features:        
+1. Add search functionality by username, email, and role.           
+2. Implement filtering options for account status and registration date range.              
+3. Update the user management API endpoints to support search and filtering.          
+4. Integrate pagination for efficient navigation.         
 
-1. **Reflection Document**: Submit a 1-2 page Word document reflecting on your learnings throughout the course and your experience working on this epic project. Include links to the closed issues for the **5 QA issues, 10 NEW tests, and 1 Feature** you'll be graded on. Make sure your project successfully deploys to DockerHub and include a link to your Docker repository in the document - let your work speak for itself! 📄🔗💥
+for implementing this feature all of these steps are done: 
 
-2. **Commit History**: Show off your consistent hard work through your commit history like a true coding warrior. **Projects with less than 10 commits will get an automatic 0 - ouch!** 😬⚠️ A significant part of your project's evaluation will be based on your use of issues, commits, and following a professional development process like a boss - prove your coding prowess! 💻🔄🔥
+1. # Routes (user_routes.py)      
+## Title:               
+Define the Search and Filtering Endpoint.           
 
-3. **Deployability**: Broken projects that don't deploy to Dockerhub or pass all the automated tests on GitHub actions will face point deductions - nobody likes a buggy app! 🐞☠️ Show the world your flawless coding skills!
+## Description:        
+This section adds a new /users endpoint in the user_routes.py file. The endpoint accepts query parameters to filter users based on specified criteria.                
 
-## Managing the Project Workload: Stay Focused, Stay Victorious ⏱️🧠⚡
+## Expected outcome:          
+The /users endpoint should:              
+1. Accept query parameters like username, email, role, account_status, and date range.                  
+2. Return filtered results as a paginated response.            
 
-This project requires effective time management and a well-planned strategy, but fear not - you've got this! Follow these steps to ensure a successful (and sane!) project outcome:
+## Resolution Steps:        
+- Added the /users endpoint with the necessary query parameters.            
+- Integrated the UserService.search_and_filter_users method for filtering.         
+- Included generate_pagination_links to support paginated responses.         
 
-1. **Select a Feature**: [Choose a feature](features.md) from the provided list of additional improvements that sparks your interest and aligns with your goals like a laser beam. ✨⭐🎯 This is your chance to shine!
+Purpose: Define the API endpoint for search and filtering functionality.        
 
-2. **Quality Assurance (QA)**: Thoroughly test the system's major functionalities related to your chosen feature and identify at least 5 issues or bugs like a true detective. Create GitHub issues for each identified problem, providing detailed descriptions and steps to reproduce - the more detail, the merrier! 🔍🐞🕵️‍♀️ Leave no stone unturned!
+```python 
+@router.get("/users", response_model=UserListResponse, tags=["User Management Requires (Admin or Manager Roles)"])
+async def search_users(
+    request: Request,
+    username: Optional[str] = None,
+    email: Optional[str] = None,
+    role: Optional[str] = None,
+    account_status: Optional[bool] = None,
+    registration_date_start: Optional[datetime] = None,
+    registration_date_end: Optional[datetime] = None,
+    skip: int = 0,
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+):
+    """
+    Endpoint to search and filter users based on various criteria.
+    """
+    filters = {
+        "username": username,
+        "email": email,
+        "role": role,
+        "account_status": account_status,
+        "registration_date_start": registration_date_start,
+        "registration_date_end": registration_date_end,
+    }
+    users, total_users = await UserService.search_and_filter_users(db, filters, skip, limit)
+    user_responses = [UserResponse.model_validate(user) for user in users]
+    pagination_links = generate_pagination_links(request, skip, limit, total_users)
 
-3. **Test Coverage Improvement**: Review the existing test suite and identify gaps in test coverage like a pro. Create 10 additional tests to cover edge cases, error scenarios, and important functionalities related to your chosen feature. Focus on areas such as user registration, login, authorization, and database interactions. Simulate the setup of the system as the admin user, then creating users, and updating user accounts - leave no stone unturned, no bug left behind! ✅🧪🔍🔬 Become the master of testing!
+    return UserListResponse(
+        items=user_responses,
+        total=total_users,
+        page=skip // limit + 1,
+        size=len(user_responses),
+        links=pagination_links
+    )
+```
+## Tests:      
+Covered by API tests in tests/test_api/test_users_api.py.
 
-4. **New Feature Implementation**: Implement your chosen feature, following the project's coding practices and architecture like a coding ninja. Write appropriate tests to ensure your new feature is functional and reliable like a rock. Document the new feature, including its usage, configuration, and any necessary migrations - future you will thank you profusely! 🚀✨📝👩‍💻⚡ Make your mark on this project!
 
-5. **Maintain a Working Main Branch**: Throughout the project, ensure you always have a working main branch deploying to Docker like a well-oiled machine. This will prevent any last-minute headaches and ensure a smooth submission process - no tears allowed, only triumphs! 😊🚢⚓ Stay focused, stay victorious!
 
-Remember, it's more important to make something work reliably and be reasonably complete than to implement an overly complex feature. Focus on creating a feature that you can build upon or demonstrate in an interview setting - show off your skills like a rockstar! 💪🚀🎓
+2. # Service Layer (user_service.py)
+## Title:       
+Implement Filtering Logic.         
 
-Don't forget to always have a working main branch deploying to Docker at all times. If you always have a working main branch, you will never be in jeopardy of receiving a very disappointing grade :-). Keep that main branch shining bright!
+## Description         
+This section defines the logic for filtering users based on criteria provided via the API. It interacts with the database and applies filters dynamically.           
 
-Let's embark on this epic coding adventure together and conquer the world of software engineering! You've got this, coding rockstars! 🚀🌟✨
+## Expected Outcome          
+The UserService.search_and_filter_users method should:
+
+1. Apply all filters, including username, email, role, account status, and date range.             
+2. Return paginated results along with the total count of users.            
+
+## Resolution Steps          
+- Implemented dynamic filtering using SQLAlchemy's query-building capabilities.               
+- Added support for pagination using offset and limit.           
+- Handled edge cases, such as missing or invalid filter values.           
+
+Purpose: Add the logic to perform filtering and querying of users from the database.          
+
+```python
+@staticmethod
+async def search_and_filter_users(
+    session: AsyncSession, 
+    filters: Dict[str, Optional[str]], 
+    skip: int, 
+    limit: int
+) -> Tuple[List[User], int]:
+    """
+    Search and filter users based on the given criteria.
+    """
+    query = select(User)
+
+    # Apply filters
+    if filters.get("username"):
+        query = query.filter(User.nickname.ilike(f"%{filters['username']}%"))
+    if filters.get("email"):
+        query = query.filter(User.email.ilike(f"%{filters['email']}%"))
+    if filters.get("role"):
+        query = query.filter(User.role == filters["role"])
+    if filters.get("account_status") is not None:
+        query = query.filter(User.email_verified == filters["account_status"])
+    if filters.get("registration_date_start") and filters.get("registration_date_end"):
+        query = query.filter(
+            User.created_at.between(filters["registration_date_start"], filters["registration_date_end"])
+        )
+
+    # Add pagination
+    query = query.offset(skip).limit(limit)
+
+    # Execute the query and count total users
+    result = await session.execute(query)
+    users = result.scalars().all()
+
+    total_query = select(func.count()).select_from(User)
+    total_result = await session.execute(total_query)
+    total_users = total_result.scalar()
+
+    return users, total_users
+```
+
+## Tests           
+Covered by service layer tests in tests/test_service/test_user_service.py.        
+
+
+
+3. # Schemas (user_schemas.py)          
+## Title:         
+Define Request Validation Model.             
+
+## Description           
+This section introduces the UserSearchParams schema to validate the query parameters sent to the /users endpoint.              
+
+## Expected Outcome          
+The schema should:           
+1. Ensure that all query parameters adhere to the expected data types.       
+2. Provide example values for API documentation purposes.          
+
+## Resolution Steps            
+- Defined the UserSearchParams model using Pydantic.              
+- Included fields for username, email, role, account_status, and date range.               
+
+Purpose: Define the models for query parameters and response structure.         
+
+```python
+class UserSearchParams(BaseModel):
+    username: Optional[str] = Field(None, example="john_doe")
+    email: Optional[EmailStr] = Field(None, example="john.doe@example.com")
+    role: Optional[UserRole] = Field(None, example="ADMIN")
+    account_status: Optional[bool] = Field(None, example=True)
+    registration_date_start: Optional[datetime] = Field(None, example="2023-01-01T00:00:00Z")
+    registration_date_end: Optional[datetime] = Field(None, example="2023-12-31T23:59:59Z")
+```
+
+## Tests              
+Implicitly tested via API endpoint tests in tests/test_api/test_users_api.py.          
+
+# Pagination Helper (utils/pagination.py)        
+## Title
+Generate Pagination Links.           
+
+## Description           
+This section adds a helper function, generate_pagination_links, to create navigation links for paginated results.              
+
+## Expected Outcome         
+The helper function should:
+1. Return next, prev, first, and last page links based on the current pagination state.                
+2. Ensure compatibility with query parameters.          
+
+## Resolution Steps          
+- Implemented the generate_pagination_links function.             
+- Calculated page links dynamically based on skip, limit, and total_items.       
+
+Purpose: Generate pagination links for the API response.          
+
+```python
+from typing import Any, Dict
+from urllib.parse import urlencode
+
+
+def generate_pagination_links(
+    request: Any, skip: int, limit: int, total_items: int
+) -> Dict[str, str]:
+    """
+    Generate pagination links for API responses.
+    """
+    base_url = str(request.url).split("?")[0]
+    query_params = dict(request.query_params)
+
+    # Calculate the next page link
+    if skip + limit < total_items:
+        query_params["skip"] = skip + limit
+        query_params["limit"] = limit
+        next_link = f"{base_url}?{urlencode(query_params)}"
+    else:
+        next_link = None
+
+    # Calculate the previous page link
+    if skip - limit >= 0:
+        query_params["skip"] = max(skip - limit, 0)
+        query_params["limit"] = limit
+        prev_link = f"{base_url}?{urlencode(query_params)}"
+    else:
+        prev_link = None
+
+    # Calculate the first and last page links
+    query_params["skip"] = 0
+    first_link = f"{base_url}?{urlencode(query_params)}"
+
+    last_page_skip = (total_items - 1) // limit * limit
+    query_params["skip"] = last_page_skip
+    last_link = f"{base_url}?{urlencode(query_params)}"
+
+    return {
+        "next": next_link,
+        "prev": prev_link,
+        "first": first_link,
+        "last": last_link,
+    }
+```
+
+5. # Test for Pagination Helper            
+## Title           
+Validate Pagination Links.           
+
+## Description           
+This section tests the behavior of the pagination helper to ensure correct link generation.             
+
+## Expected Outcome         
+The test should validate:               
+- Correctness of next, prev, first, and last links.            
+- Edge cases like the first and last pages.             
+
+## Resolution Steps               
+- Created a test for generate_pagination_links with various scenarios.           
+- Used a mocked Request object to simulate API requests.            
+
+Purpose: Validate the behavior of the pagination helper.           
+
+```python
+import pytest
+from starlette.datastructures import QueryParams, URL
+from utils.pagination import generate_pagination_links
+
+
+@pytest.mark.asyncio
+async def test_generate_pagination_links():
+    class MockRequest:
+        def __init__(self, base_url):
+            self.url = URL(base_url)
+            self.query_params = QueryParams()
+
+    request = MockRequest("http://localhost:8000/users")
+
+    skip = 0
+    limit = 10
+    total_users = 45
+
+    links = generate_pagination_links(request, skip, limit, total_users)
+
+    assert links["next"] == "http://localhost:8000/users?skip=10&limit=10"
+    assert links["prev"] is None
+    assert links["first"] == "http://localhost:8000/users?skip=0&limit=10"
+    assert links["last"] == "http://localhost:8000/users?skip=40&limit=10"
+```
+
+## Tests
+Executed the test using pytest.             
+
+6. # Test API Endpoint           
+## Title
+Validate Search and Filtering Endpoint.              
+
+## Description              
+This section tests the /users endpoint to ensure it correctly handles search and filtering requests.              
+
+## Expected Outcome             
+The test should:
+1. Verify that query parameters are correctly processed.            
+2. Ensure the endpoint returns the expected results and pagination links.          
+
+## Resolution Steps              
+- Created a test for the /users endpoint with different query parameters.            
+- Validated the structure and correctness of the response.              
+
+Purpose: Test the /users endpoint with various search and filter criteria.           
+
+```python
+@pytest.mark.asyncio
+async def test_search_users_api(async_client, admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    query_params = {
+        "username": "john",
+        "role": "ADMIN",
+        "account_status": True,
+    }
+
+    response = await async_client.get(
+        f"/users?{urlencode(query_params)}", headers=headers
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "items" in data
+    assert isinstance(data["items"], list)
+```
+
+7. # Test Service Layer           
+## Title            
+Validate Filtering Logic.          
+
+## Description              
+This section tests the filtering logic implemented in UserService.           search_and_filter_users.
+
+## Expected Outcome               
+The test should:             
+1. Ensure that filters are correctly applied.               
+2. Validate that pagination returns the expected number of results.           
+
+## Resolution Steps              
+- Created a test for UserService.search_and_filter_users with various filter combinations.            
+- Used a fixture to set up mock data.              
+
+Purpose: Test the filtering logic in the service layer.         
+
+```python
+@pytest.mark.asyncio
+async def test_search_and_filter_users(users_with_same_role_50_users, db_session):
+    filters = {"role": "ADMIN"}
+    users, total = await UserService.search_and_filter_users(
+        db_session, filters, skip=0, limit=10
+    )
+    assert len(users) == 10
+    assert total == 50
+```
+8. # Test Fixture (tests/conftest.py)             
+## Title
+Set Up Mock Data.           
+
+## Description             
+This section creates mock user data for testing purposes.           
+
+## Expected Outcome         
+The fixture should:              
+1. Create a predefined set of mock users.             
+2. Ensure that the test environment has consistent data.              
+
+## Resolution Steps             
+- Defined a fixture to create 50 mock users with the same role.           
+- Committed the data to the database session.          
+
+Purpose: Set up data for testing.          
+
+```python
+@pytest.fixture(scope="function")
+async def users_with_same_role_50_users(db_session: AsyncSession):
+    users = []
+    for i in range(50):
+        user_data = {
+            "nickname": f"user_{i}",
+            "email": f"user{i}@example.com",
+            "role": "ADMIN",
+        }
+        user = User(**user_data)
+        db_session.add(user)
+        users.append(user)
+    await db_session.commit()
+    return users
+```
+## Tests
+Used by service layer tests in tests/test_service/test_user_service.py.       
+
+## Conclusion
+The above updates comprehensively implement the feature, meeting all requirements. The code now supports search and filtering by multiple criteria, provides paginated responses, and includes extensive tests to ensure reliability.            
+
+
+
+
