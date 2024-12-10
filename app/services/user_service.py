@@ -18,6 +18,7 @@ from app.models.user_model import UserRole
 from app.utils.validators import validate_url_safe_username
 from sqlalchemy.exc import IntegrityError
 import logging
+from typing import List, Tuple 
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -231,3 +232,48 @@ class UserService:
             return user
         return None
 
+
+    @staticmethod
+    async def search_and_filter_users(
+        session: AsyncSession, 
+        filters: Dict[str, Optional[str]], 
+        skip: int, 
+        limit: int
+    ) -> Tuple[List[User], int]:
+        """
+        Search and filter users based on the given criteria.
+
+        :param session: AsyncSession for database access.
+        :param filters: Dictionary of search and filter criteria.
+        :param skip: Pagination offset.
+        :param limit: Number of records to return.
+        :return: A tuple containing the list of users and total count.
+        """
+        query = select(User)
+
+        # Apply filters
+        if filters.get("username"):
+            query = query.filter(User.nickname.ilike(f"%{filters['username']}%"))
+        if filters.get("email"):
+            query = query.filter(User.email.ilike(f"%{filters['email']}%"))
+        if filters.get("role"):
+            query = query.filter(User.role == filters["role"])
+        if filters.get("account_status") is not None:
+            query = query.filter(User.email_verified == filters["account_status"])
+        if filters.get("registration_date_start") and filters.get("registration_date_end"):
+            query = query.filter(
+                User.created_at.between(filters["registration_date_start"], filters["registration_date_end"])
+            )
+
+        # Add pagination
+        query = query.offset(skip).limit(limit)
+
+        # Execute the query and count total users
+        result = await session.execute(query)
+        users = result.scalars().all()
+
+        total_query = select(func.count()).select_from(User)
+        total_result = await session.execute(total_query)
+        total_users = total_result.scalar()
+
+        return users, total_users
