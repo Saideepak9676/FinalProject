@@ -21,7 +21,7 @@ Key Highlights:
 from builtins import dict, int, len, str
 from datetime import timedelta
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Request, Query
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_current_user, get_db, get_email_service, require_role
@@ -33,6 +33,11 @@ from app.services.jwt_service import create_access_token
 from app.utils.link_generation import create_user_links, generate_pagination_links
 from app.dependencies import get_settings
 from app.services.email_service import EmailService
+from typing import Optional
+from app.models.user_model import UserRole
+from datetime import datetime
+from app.utils.pagination import generate_pagination_links
+
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 settings = get_settings()
@@ -245,3 +250,42 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
     if await UserService.verify_email_with_token(db, user_id, token):
         return {"message": "Email verified successfully"}
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token")
+
+
+@router.get("/users", response_model=UserListResponse, tags=["User Management Requires (Admin or Manager Roles)"])
+async def search_users(
+    request: Request,
+    username: Optional[str] = None,
+    email: Optional[str] = None,
+    role: Optional[str] = None,
+    account_status: Optional[bool] = None,
+    registration_date_start: Optional[datetime] = None,
+    registration_date_end: Optional[datetime] = None,
+    skip: int = 0,
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+):
+    """
+    Endpoint to search and filter users based on various criteria.
+    """
+    filters = {
+        "username": username,
+        "email": email,
+        "role": role,
+        "account_status": account_status,
+        "registration_date_start": registration_date_start,
+        "registration_date_end": registration_date_end,
+    }
+    print("Received filters:", filters)  # Debug log
+    users, total_users = await UserService.search_and_filter_users(db, filters, skip, limit)
+    user_responses = [UserResponse.model_validate(user) for user in users]
+    pagination_links = generate_pagination_links(request, skip, limit, total_users)
+
+    return UserListResponse(
+        items=user_responses,
+        total=total_users,
+        page=skip // limit + 1,
+        size=len(user_responses),
+        links=pagination_links
+    )
