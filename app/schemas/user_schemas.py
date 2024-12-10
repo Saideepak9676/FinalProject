@@ -94,3 +94,12 @@ class UserListResponse(BaseModel):
     total: int = Field(..., example=100)
     page: int = Field(..., example=1)
     size: int = Field(..., example=10)
+
+
+class UserSearchParams(BaseModel):
+    username: Optional[str] = Field(None, example="john_doe")
+    email: Optional[EmailStr] = Field(None, example="john.doe@example.com")
+    role: Optional[UserRole] = Field(None, example="ADMIN")
+    account_status: Optional[bool] = Field(None, example=True)
+    registration_date_start: Optional[datetime] = Field(None, example="2023-01-01T00:00:00Z")
+    registration_date_end: Optional[datetime] = Field(None, example="2023-12-31T23:59:59Z")
