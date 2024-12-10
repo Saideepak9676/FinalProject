@@ -6,6 +6,8 @@ from app.dependencies import get_settings
 from app.models.user_model import User, UserRole
 from app.services.user_service import UserService
 from app.utils.nickname_gen import generate_nickname
+from datetime import datetime
+
 
 pytestmark = pytest.mark.asyncio
 
@@ -214,4 +216,38 @@ async def test_update_user_duplicate_nickname(db_session, user, another_user):
     assert exc_info.value.status_code == 400
     assert "Nickname already exists" in str(exc_info.value.detail)
 
+
+@pytest.mark.asyncio
+async def test_search_users_by_username(db_session, users_with_same_role_50_users):
+    filters = {"username": "john"}
+    users, total = await UserService.search_and_filter_users(db_session, filters, 0, 10)
+    assert total > 0
+    assert all("john" in user.nickname.lower() for user in users)
+
+@pytest.mark.asyncio
+async def test_filter_users_by_role(db_session, users_with_same_role_50_users):
+    filters = {"role": UserRole.ADMIN.name}
+    users, total = await UserService.search_and_filter_users(db_session, filters, 0, 10)
+    assert total > 0
+    assert all(user.role == UserRole.ADMIN for user in users)
+
+@pytest.mark.asyncio
+async def test_filter_users_by_account_status(db_session, users_with_same_role_50_users):
+    filters = {"account_status": True}
+    users, total = await UserService.search_and_filter_users(db_session, filters, 0, 10)
+    assert total > 0
+    assert all(user.email_verified for user in users)
+
+@pytest.mark.asyncio
+async def test_filter_users_by_registration_date(db_session, users_with_same_role_50_users):
+    filters = {
+        "registration_date_start": datetime(2023, 1, 1),
+        "registration_date_end": datetime(2023, 12, 31)
+    }
+    users, total = await UserService.search_and_filter_users(db_session, filters, 0, 10)
+    assert total > 0
+    assert all(
+        datetime(2023, 1, 1) <= user.created_at <= datetime(2023, 12, 31)
+        for user in users
+    )
 
