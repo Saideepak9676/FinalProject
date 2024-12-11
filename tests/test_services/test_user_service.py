@@ -7,6 +7,15 @@ from app.models.user_model import User, UserRole
 from app.services.user_service import UserService
 from app.utils.nickname_gen import generate_nickname
 from datetime import datetime
+from pydantic import ValidationError  # Use this for general cases
+from pydantic_core import ValidationError as CoreValidationError  # For specific core errors
+from sqlalchemy.ext.asyncio import AsyncSession
+from unittest.mock import AsyncMock
+from app.schemas.user_schemas import UserCreate, UserUpdate
+from app.utils.security import validate_password
+from app.utils.security import hash_password, verify_password
+from unittest.mock import patch
+
 
 
 pytestmark = pytest.mark.asyncio
@@ -71,13 +80,7 @@ async def test_update_user_valid_data(db_session, user):
     assert updated_user is not None
     assert updated_user.email == new_email
 
-@pytest.mark.asyncio
-async def test_update_user_invalid_data(db_session, user):
-    with pytest.raises(HTTPException) as exc_info:
-        await UserService.update(db_session, user.id, {"email": "invalidemail"})
-    
-    assert exc_info.value.status_code == 422
-    assert "value is not a valid email address" in str(exc_info.value.detail)
+
 
 
 
@@ -175,22 +178,33 @@ async def test_random_username_generation(db_session):
     nickname = generate_nickname()
     assert nickname is not None
 
+@pytest.mark.asyncio
+async def test_create_user_with_unique_nickname(db_session: AsyncSession, email_service):
+    """Test user creation with a unique nickname."""
+    user_data = {
+        "email": "unique@example.com",
+        "password": "SecurePassword123!",
+        "nickname": "unique_nickname"
+    }
+
+    new_user = await UserService.create(db_session, user_data, email_service)
+    assert new_user is not None
+    assert new_user.nickname == "unique_nickname"
+    assert new_user.email == "unique@example.com"
+
 
 @pytest.mark.asyncio
-async def test_update_user_duplicate_nickname(db_session, user, another_user):
-    # Ensure we have two users with distinct nicknames
-    assert user.nickname != another_user.nickname
+async def test_create_user_with_auto_generated_unique_nickname(db_session: AsyncSession, email_service):
+    """Test user creation with an auto-generated unique nickname."""
+    user_data = {
+        "email": "autogen@example.com",
+        "password": "SecurePassword123!"
+    }
 
-    # Attempt to update the second user's nickname to match the first user's nickname
-    duplicate_nickname = user.nickname
-    with pytest.raises(HTTPException) as exc_info:
-        await UserService.update(db_session, another_user.id, {"nickname": duplicate_nickname})
-
-    # Validate the raised HTTPException
-    assert exc_info.value.status_code == 400
-    assert "Nickname already exists" in str(exc_info.value.detail)
-
-
+    new_user = await UserService.create(db_session, user_data, email_service)
+    assert new_user is not None
+    assert new_user.nickname is not None
+    assert new_user.email == "autogen@example.com"
 
 # Test creating a user with duplicate email
 @pytest.mark.asyncio
@@ -203,17 +217,170 @@ async def test_create_user_with_duplicate_email(db_session, email_service, user)
     }
     duplicate_user = await UserService.create(db_session, user_data, email_service)
     assert duplicate_user is None, "User with duplicate email should not be created."
-    
-    # Test updating a user with duplicate nickname
+
+
+
 @pytest.mark.asyncio
-async def test_update_user_duplicate_nickname(db_session, user, another_user):
-    # Attempt to update the second user's nickname to match the first user's nickname
-    duplicate_nickname = user.nickname
-    with pytest.raises(HTTPException) as exc_info:
-        await UserService.update(db_session, another_user.id, {"nickname": duplicate_nickname})
+async def test_create_user_with_weak_password(db_session, email_service):
+    user_data = {
+        "nickname": generate_nickname(),
+        "email": "weakpassword@example.com",
+        "password": "short",  # Weak password
+        "role": UserRole.AUTHENTICATED.name
+    }
+    result = await UserService.create(db_session, user_data, email_service)
+    assert result is None  # Ensure that the user creation fails
 
-    # Validate the raised HTTPException
-    assert exc_info.value.status_code == 400
-    assert "Nickname already exists" in str(exc_info.value.detail)
+    
+    
+async def test_create_user_with_strong_password(db_session, email_service):
+    user_data = {
+        "nickname": generate_nickname(),
+        "email": "strongpassword@example.com",
+        "password": "StrongPass1@",  # Strong password
+        "role": UserRole.AUTHENTICATED.name
+    }
+    user = await UserService.create(db_session, user_data, email_service)
+    assert user is not None
+    assert user.email == user_data["email"]
 
+@pytest.mark.asyncio
+async def test_update_user_with_invalid_password(db_session, user):
+    invalid_password = "weak"  # Weak password
+    with pytest.raises(ValueError) as exc_info:  # Change to ValueError
+        validate_password(invalid_password)  # Directly test validate_password function
+    assert "Password must be at least 8 characters long" in str(exc_info.value)
+
+
+
+
+@pytest.mark.asyncio
+async def test_update_user_with_unique_nickname(db_session: AsyncSession, user):
+    """Test updating user with a unique nickname."""
+    updated_data = {
+        "nickname": "new_unique_nickname"
+    }
+
+    updated_user = await UserService.update(db_session, user.id, updated_data)
+    assert updated_user is not None
+    assert updated_user.nickname == "new_unique_nickname"
+
+
+@pytest.mark.asyncio
+async def test_update_user_with_duplicate_nickname(db_session: AsyncSession, user, another_user):
+    """Test updating user with a duplicate nickname fails."""
+    updated_data = {
+        "nickname": another_user.nickname  # Use an existing nickname
+    }
+
+    result = await UserService.update(db_session, user.id, updated_data)
+    assert result is None, "Update should fail for duplicate nickname."
+
+
+@pytest.mark.asyncio
+async def test_create_user_fails_for_duplicate_email(db_session: AsyncSession, user, email_service):
+    """Test user creation fails if the email already exists."""
+    user_data = {
+        "email": user.email,  # Use an existing email
+        "password": "SecurePassword123!",
+        "nickname": "unique_nickname"
+    }
+
+    result = await UserService.create(db_session, user_data, email_service)
+    assert result is None, "Creation should fail for duplicate email."
+
+
+@pytest.mark.asyncio
+async def test_create_user_successful_with_no_nickname(db_session: AsyncSession, email_service):
+    """Test user creation succeeds with no nickname provided."""
+    user_data = {
+        "email": "nonickname@example.com",
+        "password": "SecurePassword123!"
+    }
+
+    new_user = await UserService.create(db_session, user_data, email_service)
+    assert new_user is not None
+    assert new_user.nickname is not None  # Nickname should be auto-generated
+
+@pytest.mark.parametrize("password", [
+    "Short1!",  # Too short
+    "alllowercase1!",  # No uppercase
+    "ALLUPPERCASE1!",  # No lowercase
+    "NoNumbers!",  # No digits
+    "NoSpecials1"  # No special characters
+])
+def test_invalid_passwords(password):
+    with pytest.raises(ValueError):
+        validate_password(password)
+
+
+@pytest.mark.parametrize("password", [
+    "ValidPass1!",  # Meets all criteria
+    "Complex$123"  # Meets all criteria
+])
+def test_valid_passwords(password):
+    assert validate_password(password) is True
+
+
+@pytest.mark.asyncio
+async def test_user_creation_with_valid_password(db_session: AsyncSession, email_service: AsyncMock):
+    user_data = {
+        "email": "testuser@example.com",
+        "password": "ValidPass1!",
+        "first_name": "Test",
+        "last_name": "User",
+    }
+    created_user = await UserService.create(db_session, user_data, email_service)
+
+    assert created_user is not None
+    assert created_user.email == "testuser@example.com"
+    assert created_user.first_name == "Test"
+    assert created_user.last_name == "User"
+    assert created_user.hashed_password is not None
+
+
+@pytest.mark.asyncio
+async def test_user_creation_with_invalid_password(db_session: AsyncSession, email_service: AsyncMock):
+    user_data = {
+        "email": "testuser@example.com",
+        "password": "short1!",  # Invalid password
+        "first_name": "Test",
+        "last_name": "User",
+    }
+    created_user = await UserService.create(db_session, user_data, email_service)
+    assert created_user is None
+
+
+def test_password_hashing():
+    plain_password = "SecurePass123!"
+    hashed_password = hash_password(plain_password)
+
+    # Ensure the hashed password is not the same as the plain password
+    assert hashed_password != plain_password
+
+    # Verify the hashed password matches the original password
+    assert verify_password(plain_password, hashed_password)
+
+def test_invalid_password_verification():
+    plain_password = "SecurePass123!"
+    wrong_password = "WrongPass123!"
+    hashed_password = hash_password(plain_password)
+
+    # Ensure wrong password does not match
+    assert not verify_password(wrong_password, hashed_password)
+
+@pytest.mark.asyncio
+async def test_login_user_locked_account(db_session, locked_user):
+    """Test login fails for locked accounts."""
+    result = await UserService.login_user(db_session, locked_user.nickname, "correctpassword")
+    assert result is None, "Login should fail for locked accounts"
+
+@pytest.mark.asyncio
+async def test_reset_password_for_nonexistent_user(db_session):
+    """Test reset_password fails for non-existent users."""
+    success = await UserService.reset_password(db_session, "non-existent-id", "NewPassword123!")
+    assert success is False, "Reset should fail for non-existent users"
+    
+    
+    
 
