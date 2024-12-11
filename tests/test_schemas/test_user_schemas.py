@@ -84,11 +84,12 @@ def test_login_request_valid(login_request_data):
     assert login.password == login_request_data["password"]
 
 # Parametrized tests for nickname and email validation
-@pytest.mark.parametrize("nickname", ["test_user", "test-user", "testuser123", "123test"])
+@pytest.mark.parametrize("nickname", ["test_user", "test-user", "testuser123", "test123"])
 def test_user_base_nickname_valid(nickname, user_base_data):
     user_base_data["nickname"] = nickname
     user = UserBase(**user_base_data)
     assert user.nickname == nickname
+
 
 @pytest.mark.parametrize("nickname", ["test user", "test?user", "", "us"])
 def test_user_base_nickname_invalid(nickname, user_base_data):

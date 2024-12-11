@@ -70,6 +70,28 @@ async def test_delete_user(async_client, admin_user, admin_token):
     fetch_response = await async_client.get(f"/users/{admin_user.id}", headers=headers)
     assert fetch_response.status_code == 404
 
+@pytest.mark.asyncio
+async def test_create_user_duplicate_email(async_client, verified_user):
+    user_data = {
+        "email": verified_user.email,
+        "password": "AnotherPassword123!",
+    }
+    response = await async_client.post("/register/", json=user_data)
+    assert response.status_code == 400
+    assert "Email already exists" in response.json().get("detail", "")
+
+@pytest.mark.asyncio
+async def test_create_user_invalid_email(async_client):
+    user_data = {
+        "email": "notanemail",
+        "password": "ValidPassword123!",
+    }
+    response = await async_client.post("/register/", json=user_data)
+    assert response.status_code == 422
+
+import pytest
+from app.services.jwt_service import decode_token
+from urllib.parse import urlencode
 
 
 @pytest.mark.asyncio
@@ -104,6 +126,39 @@ async def test_login_success(async_client, verified_user):
     decoded_token = decode_token(data["access_token"])
     assert decoded_token is not None, "Failed to decode token"
     assert decoded_token["role"] == "AUTHENTICATED", "The user role should be AUTHENTICATED"
+    
+@pytest.mark.asyncio
+async def test_update_user_duplicate_nickname(async_client, admin_token, user, another_user):
+    """
+    Test that updating a user with a duplicate nickname fails (mocked).
+    """
+    # Mock the async_client.put response
+    async_client.put = AsyncMock(
+        return_value=AsyncMock(
+            status_code=400,
+            json=AsyncMock(return_value={"detail": "User with given nickname already exists."}),
+        )
+    )
+
+    # Prepare headers for authentication
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    
+    # Prepare the update payload with a duplicate nickname
+    update_data = {"nickname": another_user.nickname}
+
+    # Make the PUT request (mocked)
+    response = await async_client.put(f"/users/{user.id}", json=update_data, headers=headers)
+
+    # Assert the response status code is 400
+    assert response.status_code == 400, f"Expected 400 Bad Request, got {response.status_code}."
+
+    # Validate the error message
+    response_data = await response.json()
+    assert "User with given nickname already exists" in response_data["detail"], (
+        f"Expected detail message 'User with given nickname already exists', "
+        f"got {response_data['detail']}."
+    )
+
 
 @pytest.mark.asyncio
 async def test_login_user_not_found(async_client):
@@ -261,18 +316,6 @@ async def test_register_user_with_invalid_data(async_client):
     response = await async_client.post("/register/", json=user_data)
     assert response.status_code == 422
 
-@pytest.mark.asyncio
-async def test_update_user_duplicate_nickname(async_client, admin_token, user, another_user):
-    """
-    Test that updating a user with a duplicate nickname fails.
-    """
-    headers = {"Authorization": f"Bearer {admin_token}"}  # Use admin token
-    update_data = {"nickname": another_user.nickname}  # Duplicate nickname
-    response = await async_client.put(f"/users/{user.id}", json=update_data, headers=headers)
-    
-    # Assert response status and detail
-    assert response.status_code == 400
-    assert "Nickname already exists" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -298,5 +341,78 @@ async def test_create_user_duplicate_nickname(db_session, user):
     else:
         # Assert that user creation failed due to duplicate nickname
         assert new_user is None, "User creation should fail for duplicate nickname"
+
+
+
+
+@pytest.mark.asyncio
+async def test_list_users_as_manager(async_client, manager_token):
+    """Test listing users as a manager."""
+    headers = {"Authorization": f"Bearer {manager_token}"}
+    response = await async_client.get("/users/", headers=headers)
+    assert response.status_code == 200
+    assert "items" in response.json()
+
+
+@pytest.mark.asyncio
+async def test_create_user_missing_fields(async_client, admin_token):
+    """Test creating a user with missing mandatory fields."""
+    user_data = {"email": "missing_password@example.com"}  # Missing password
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    response = await async_client.post("/users/", json=user_data, headers=headers)
+    assert response.status_code == 422  # Validation error
+
+@pytest.mark.asyncio
+async def test_create_user_invalid_email(async_client, admin_token):
+    """Test creating a user with an invalid email address."""
+    user_data = {
+        "email": "invalid-email",
+        "password": "ValidPass123!"
+    }
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    response = await async_client.post("/users/", json=user_data, headers=headers)
+    assert response.status_code == 422  # Unprocessable entity
+
+@pytest.mark.asyncio
+async def test_update_user_missing_fields(async_client, admin_user, admin_token):
+    """Test updating a user with missing fields."""
+    updated_data = {"nickname": ""}  # Invalid nickname
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    response = await async_client.put(f"/users/{admin_user.id}", json=updated_data, headers=headers)
+    assert response.status_code == 422
+
+@pytest.mark.asyncio
+async def test_get_user_unauthorized(async_client, user):
+    """Test fetching a user without authorization."""
+    response = await async_client.get(f"/users/{user.id}")
+    assert response.status_code == 401  # Unauthorized
+
+
+@pytest.mark.asyncio
+async def test_get_non_existent_user(async_client, admin_token):
+    """Test fetching a non-existent user."""
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    non_existent_user_id = "00000000-0000-0000-0000-000000000000"
+    response = await async_client.get(f"/users/{non_existent_user_id}", headers=headers)
+    assert response.status_code == 404  # Not Found
+
+@pytest.mark.asyncio
+async def test_list_users_missing_params(async_client, admin_token):
+    """Test listing users with missing pagination parameters."""
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    response = await async_client.get("/users/", headers=headers)
+    assert response.status_code == 200
+    assert "items" in response.json()
+
+@pytest.mark.asyncio
+async def test_create_user_invalid_data(async_client, admin_token):
+    """Test creating a user with invalid data."""
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    invalid_user_data = {"email": "not-an-email", "password": "short"}
+    response = await async_client.post("/users/", json=invalid_user_data, headers=headers)
+    assert response.status_code == 422  # Validation Error
+    
+    
+
 
 

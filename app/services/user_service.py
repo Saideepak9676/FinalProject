@@ -11,7 +11,7 @@ from app.dependencies import get_email_service, get_settings
 from app.models.user_model import User
 from app.schemas.user_schemas import UserCreate, UserUpdate
 from app.utils.nickname_gen import generate_nickname
-from app.utils.security import generate_verification_token, hash_password, verify_password
+from app.utils.security import generate_verification_token, hash_password, verify_password, validate_password
 from uuid import UUID
 from app.services.email_service import EmailService
 from app.models.user_model import UserRole
@@ -19,6 +19,8 @@ from app.utils.validators import validate_url_safe_username
 from sqlalchemy.exc import IntegrityError
 import logging
 from typing import List, Tuple 
+
+
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -56,74 +58,91 @@ class UserService:
     @classmethod
     async def create(cls, session: AsyncSession, user_data: Dict[str, str], email_service: EmailService) -> Optional[User]:
         try:
-            validated_data = UserCreate(**user_data).model_dump()
-            existing_user = await cls.get_by_email(session, validated_data['email'])
-            if existing_user:
-                logger.error("User with given email already exists.")
-                return None
-            validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
-            new_user = User(**validated_data)
-            new_user.verification_token = generate_verification_token()
-            new_nickname = generate_nickname()
-            while await cls.get_by_nickname(session, new_nickname):
-                new_nickname = generate_nickname()
-            new_user.nickname = new_nickname
-            session.add(new_user)
-            await session.commit()
-            await email_service.send_verification_email(new_user)
-            
-            return new_user
+           # Set default role if not provided
+           user_data.setdefault("role", UserRole.AUTHENTICATED.name)
+           validated_data = UserCreate(**user_data).model_dump()
+
+           # Check for existing email
+           existing_user = await cls.get_by_email(session, validated_data['email'])
+           if existing_user:
+               logger.error("User with given email already exists.")
+               return None
+
+           # Validate and hash password
+           password = validated_data.pop('password')
+           try:
+               validate_password(password)  # Ensures password meets security criteria
+           except ValueError as e:
+               logger.error(f"Password validation failed: {e}")
+               return None
+           validated_data['hashed_password'] = hash_password(password)
+
+           # Check for existing nickname
+           if validated_data.get("nickname"):
+               existing_nickname = await cls.get_by_nickname(session, validated_data["nickname"])
+               if existing_nickname:
+                   logger.error("User with given nickname already exists.")
+                   return None
+           else:
+               # Auto-generate a unique nickname if not provided
+               new_nickname = generate_nickname()
+               while await cls.get_by_nickname(session, new_nickname):
+                   new_nickname = generate_nickname()
+               validated_data["nickname"] = new_nickname
+
+           # Prepare new user
+           new_user = User(**validated_data)
+
+           # Add and commit new user
+           new_user.verification_token = generate_verification_token()
+           session.add(new_user)
+           await session.commit()
+
+           # Send verification email
+           await email_service.send_verification_email(new_user)
+           return new_user
+
         except ValidationError as e:
             logger.error(f"Validation error during user creation: {e}")
             return None
-
+        except Exception as e:
+            logger.error(f"Unexpected error during user creation: {e}")
+            return None
 
 
     @classmethod
     async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str]) -> Optional[User]:
         try:
-            # Validate incoming data using UserUpdate schema
             validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
 
-            # Handle password updates
+            # Check for nickname uniqueness if nickname is being updated
+            if "nickname" in validated_data:
+                existing_nickname = await cls.get_by_nickname(session, validated_data["nickname"])
+                if existing_nickname and existing_nickname.id != user_id:
+                    logger.error("User with given nickname already exists.")
+                    return None
+
+            # Hash the password if being updated
             if 'password' in validated_data:
-               validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
+                validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
 
-            # Handle nickname updates
-            if 'nickname' in validated_data:
-             existing_user = await cls.get_by_nickname(session, validated_data['nickname'])
-             if existing_user and existing_user.id != user_id:
-                 logger.error(f"Nickname '{validated_data['nickname']}' already exists.")
-                 raise HTTPException(status_code=400, detail="Nickname already exists.")
-
-            # Execute the update query
-            query = (
-            update(User)
-            .where(User.id == user_id)
-            .values(**validated_data)
-            .execution_options(synchronize_session="fetch")
-            )
+            # Update the user
+            query = update(User).where(User.id == user_id).values(**validated_data).execution_options(synchronize_session="fetch")
             await cls._execute_query(session, query)
 
-            # Fetch and return the updated user
             updated_user = await cls.get_by_id(session, user_id)
             if updated_user:
-             session.refresh(updated_user)
-             logger.info(f"User {user_id} updated successfully.")
-             return updated_user
-            else:
-                logger.error(f"User {user_id} not found after update attempt.")
-                raise HTTPException(status_code=404, detail="User not found.")
-        except ValidationError as ve:
-            logger.error(f"Validation error during user update: {ve}")
-            raise HTTPException(status_code=422, detail=str(ve))
-        except HTTPException as he:
-            logger.error(f"HTTPException during user update: {he.detail}")
-            raise he
+                session.refresh(updated_user)  # Explicitly refresh the updated user object
+                logger.info(f"User {user_id} updated successfully.")
+                return updated_user
+
+            logger.error(f"User {user_id} not found after update attempt.")
+            return None
+
         except Exception as e:
-            logger.error(f"Unexpected error during user update: {e}")
-            raise HTTPException(status_code=500, detail="An unexpected error occurred during user update.")
-        
+            logger.error(f"Error during user update: {e}")
+            return None
+
     @classmethod
     async def delete(cls, session: AsyncSession, user_id: UUID) -> bool:
         user = await cls.get_by_id(session, user_id)
@@ -277,3 +296,9 @@ class UserService:
         total_users = total_result.scalar()
 
         return users, total_users
+
+def generate_unique_nickname(session) -> str:
+    while True:
+        nickname = generate_nickname()
+        if not session.query(User).filter_by(nickname=nickname).first():
+            return nickname
