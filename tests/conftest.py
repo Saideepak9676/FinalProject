@@ -16,6 +16,7 @@ Fixtures:
 # Standard library imports
 from builtins import Exception, range, str
 from datetime import timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -37,6 +38,8 @@ from app.utils.template_manager import TemplateManager
 from app.services.email_service import EmailService
 from app.services.jwt_service import create_access_token
 
+
+
 fake = Faker()
 
 settings = get_settings()
@@ -52,6 +55,18 @@ def email_service():
     template_manager = TemplateManager()
     email_service = EmailService(template_manager=template_manager)
     return email_service
+
+@pytest.fixture
+async def another_user(db_session: AsyncSession):
+    """Fixture for another existing user."""
+    another_user = User(
+        email="anotheruser@example.com",
+        hashed_password=hash_password("AnotherPassword123!"),  # Properly hash the password
+        nickname="another_nickname"
+    )
+    db_session.add(another_user)
+    await db_session.commit()
+    return another_user
 
 
 # this is what creates the http client for your api tests
@@ -261,3 +276,60 @@ async def another_user(db_session):
     await db_session.commit()
     await db_session.refresh(user)
     return user
+
+# Fixtures for common test data
+@pytest.fixture
+def user_base_data():
+    return {
+        "nickname": "john_doe",
+        "username": "john_doe_123",
+        "email": "john.doe@example.com",
+        "full_name": "John Doe",
+        "bio": "I am a software engineer with over 5 years of experience.",
+        "profile_picture_url": "https://example.com/profile_pictures/john_doe.jpg"
+    }
+
+@pytest.fixture
+def user_base_data_invalid():
+    return {
+        "username": "john_doe_123",
+        "email": "john.doe.example.com",
+        "full_name": "John Doe",
+        "bio": "I am a software engineer with over 5 years of experience.",
+        "profile_picture_url": "https://example.com/profile_pictures/john_doe.jpg"
+    }
+    
+@pytest.fixture
+def user_create_data(user_base_data):
+    return {**user_base_data, "password": "SecurePassword123!"}
+
+@pytest.fixture
+def user_update_data():
+    return {
+        "email": "john.doe.new@example.com",
+        "first_name": "John",
+        "full_name": "John H. Doe",
+        "bio": "I specialize in backend development with Python and Node.js.",
+        "profile_picture_url": "https://example.com/profile_pictures/john_doe_updated.jpg"
+    }
+    
+@pytest.fixture
+def user_response_data():
+    return {
+        "id": uuid4(),
+        "username": "testuser",
+        "email": "test@example.com",
+        "last_login_at": datetime.now(),
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+        "links": []
+    }
+    
+@pytest.fixture
+def login_request_data():
+    return {"email": "john_doe@example.com", "password": "SecurePassword123!"}
+
+
+
+
+
