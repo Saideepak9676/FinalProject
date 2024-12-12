@@ -37,10 +37,14 @@ from typing import Optional
 from app.models.user_model import UserRole
 from datetime import datetime
 from app.utils.pagination import generate_pagination_links
+from app.schemas.user_schemas import UpdateProfilePictureRequest
+import logging
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
 @router.get("/users/{user_id}", response_model=UserResponse, name="get_user", tags=["User Management Requires (Admin or Manager Roles)"])
 async def get_user(user_id: UUID, request: Request, db: AsyncSession = Depends(get_db), token: str = Depends(oauth2_scheme), current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))):
     """
@@ -92,6 +96,16 @@ async def update_user(user_id: UUID, user_update: UserUpdate, request: Request, 
     - **user_update**: UserUpdate model with updated user information.
     """
     user_data = user_update.model_dump(exclude_unset=True)
+    
+    # Check for nickname uniqueness if it is being updated
+    if "nickname" in user_data:
+        existing_user_with_nickname = await UserService.get_by_nickname(db, user_data["nickname"])
+        if existing_user_with_nickname and existing_user_with_nickname.id != user_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nickname already exists")
+
+    
+    
+    # Update user
     updated_user = await UserService.update(db, user_id, user_data)
     if not updated_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -145,10 +159,18 @@ async def create_user(user: UserCreate, request: Request, db: AsyncSession = Dep
     Returns:
     - UserResponse: The newly created user's information along with navigation links.
     """
+    #checking for existing email
     existing_user = await UserService.get_by_email(db, user.email)
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
     
+    #check for exsting nickname
+    if user.nickname:
+        existing_nickname = await UserService.get_by_nickname(db, user.nickname)
+        if existing_nickname:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nickname already exists")
+    
+    # Create user
     created_user = await UserService.create(db, user.model_dump(), email_service)
     if not created_user:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create user")
@@ -206,38 +228,28 @@ async def register(user_data: UserCreate, session: AsyncSession = Depends(get_db
 
 @router.post("/login/", response_model=TokenResponse, tags=["Login and Registration"])
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_db)):
-    if await UserService.is_account_locked(session, form_data.username):
-        raise HTTPException(status_code=400, detail="Account locked due to too many failed login attempts.")
+    try:
+        if await UserService.is_account_locked(session, form_data.username):
+            raise HTTPException(status_code=400, detail="Account locked due to too many failed login attempts.")
+        logger.info(f"Checking username {form_data.username} ")
 
-    user = await UserService.login_user(session, form_data.username, form_data.password)
-    if user:
-        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-
-        access_token = create_access_token(
-            data={"sub": user.email, "role": str(user.role.name)},
-            expires_delta=access_token_expires
-        )
-
-        return {"access_token": access_token, "token_type": "bearer"}
-    raise HTTPException(status_code=401, detail="Incorrect email or password.")
-
-@router.post("/login/", include_in_schema=False, response_model=TokenResponse, tags=["Login and Registration"])
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_db)):
-    if await UserService.is_account_locked(session, form_data.username):
-        raise HTTPException(status_code=400, detail="Account locked due to too many failed login attempts.")
-
-    user = await UserService.login_user(session, form_data.username, form_data.password)
-    if user:
-        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-
-        access_token = create_access_token(
-            data={"sub": user.email, "role": str(user.role.name)},
-            expires_delta=access_token_expires
-        )
-
-        return {"access_token": access_token, "token_type": "bearer"}
-    raise HTTPException(status_code=401, detail="Incorrect email or password.")
-
+        user = await UserService.login_user(session, form_data.username, form_data.password)
+        logger.info(f"User : {user} ")
+        if user:
+            access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+            access_token = create_access_token(
+                data={"sub": user.email, "role": str(user.role.name)},
+                expires_delta=access_token_expires
+            )
+            return {"access_token": access_token, "token_type": "bearer"}
+        raise HTTPException(status_code=401, detail="Incorrect email or password.")
+    except HTTPException as e:
+        # Re-raise HTTP exceptions as-is
+        raise e
+    except Exception as e:
+        # Log unexpected errors and return a generic 500 response
+        logger.error(f"Unexpected error during login: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
 @router.get("/verify-email/{user_id}/{token}", status_code=status.HTTP_200_OK, name="verify_email", tags=["Login and Registration"])
 async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get_db), email_service: EmailService = Depends(get_email_service)):
@@ -289,3 +301,49 @@ async def search_users(
         size=len(user_responses),
         links=pagination_links
     )
+    
+    ##########################
+@router.patch("/users/{user_id}/profile-picture", response_model=UserResponse, name="update_user_profile_picture", tags=["User Profile"])
+async def update_user_profile_picture(
+    user_id: UUID,
+    picture_data: UpdateProfilePictureRequest,  # Expecting a proper JSON body
+    db: AsyncSession = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
+    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+):
+    """
+    Update the user's profile picture URL.
+    """
+    # Check if the user exists
+    user = await UserService.get_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Perform the update
+    updated_user = await UserService.update(db, user_id, {"profile_picture_url": picture_data.profile_picture_url})
+    
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid profile picture URL or other update issues."
+        )
+    
+    return UserResponse.model_validate(updated_user)
+
+@router.patch("/users/{user_id}/bio", response_model=UserResponse, name="update_user_bio", tags=["User Profile"])
+async def update_user_bio(
+    user_id: UUID,
+    bio_data: dict,
+    db: AsyncSession = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
+    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+):
+    if not bio_data.get("bio"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bio field is required.")
+    
+    updated_user = await UserService.update(db, user_id, {"bio": bio_data["bio"]})
+    if not updated_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Exclude updated_at from the returned response
+    return UserResponse.model_validate(updated_user)
