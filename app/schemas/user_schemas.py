@@ -160,3 +160,8 @@ class UserSearchParams(BaseModel):
     account_status: Optional[bool] = Field(None, example=True)
     registration_date_start: Optional[datetime] = Field(None, example="2023-01-01T00:00:00Z")
     registration_date_end: Optional[datetime] = Field(None, example="2023-12-31T23:59:59Z")
+######################
+from pydantic import BaseModel, Field
+
+class UpdateProfilePictureRequest(BaseModel):
+    profile_picture_url: str = Field(..., description="The new profile picture URL.", example="https://example.com/profiles/john_new.jpg")

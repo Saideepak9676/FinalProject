@@ -3,6 +3,7 @@ import pytest
 from pydantic import ValidationError
 from datetime import datetime
 from app.schemas.user_schemas import UserBase, UserCreate, UserUpdate, UserResponse, UserListResponse, LoginRequest
+from app.schemas.user_schemas import validate_nickname
 
 # Fixtures for common test data
 @pytest.fixture
@@ -109,3 +110,37 @@ def test_user_base_url_invalid(url, user_base_data):
     user_base_data["profile_picture_url"] = url
     with pytest.raises(ValidationError):
         UserBase(**user_base_data)
+        
+        
+############
+def test_validate_nickname_valid_cases():
+    """
+    Test valid nicknames.
+    """
+    valid_nicknames = [
+        "john_doe",     # Alphanumeric with an underscore
+        "john-doe",     # Alphanumeric with a hyphen
+        "john123",      # Alphanumeric
+        "a" * 30,       # Maximum allowed length
+        "John_Doe"      # Case sensitivity
+    ]
+    for nickname in valid_nicknames:
+        assert validate_nickname(nickname) == nickname
+
+def test_validate_nickname_invalid_cases():
+    """
+    Test invalid nicknames.
+    """
+    invalid_nicknames = [
+        "john doe",     # Space is not allowed
+        "123john",      # Does not start with a letter
+        "j@hn",         # Contains invalid characters
+        "a" * 31,       # Exceeds maximum length
+        "jo"            # Too short (less than 3 characters)
+    ]
+    for nickname in invalid_nicknames:
+        with pytest.raises(ValueError) as exc_info:
+            validate_nickname(nickname)
+        assert "Nickname must start with a letter" in str(exc_info.value) or \
+               "must be 3-30 characters long" in str(exc_info.value) or \
+               "contain only alphanumeric characters" in str(exc_info.value)

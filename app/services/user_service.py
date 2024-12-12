@@ -27,20 +27,22 @@ logger = logging.getLogger(__name__)
 
 class UserService:
     @classmethod
-    async def _execute_query(cls, session: AsyncSession, query):
+    async def _execute_query(cls, session: AsyncSession, query, commit: bool = False):
         try:
             result = await session.execute(query)
-            await session.commit()
+            if commit:  # Only commit if the `commit` parameter is True
+                await session.commit()
             return result
         except SQLAlchemyError as e:
             logger.error(f"Database error: {e}")
             await session.rollback()
             return None
 
+
     @classmethod
     async def _fetch_user(cls, session: AsyncSession, **filters) -> Optional[User]:
         query = select(User).filter_by(**filters)
-        result = await cls._execute_query(session, query)
+        result = await cls._execute_query(session, query, commit=False)  # Explicitly specify commit=False for clarity
         return result.scalars().first() if result else None
 
     @classmethod
@@ -302,3 +304,7 @@ def generate_unique_nickname(session) -> str:
         nickname = generate_nickname()
         if not session.query(User).filter_by(nickname=nickname).first():
             return nickname
+@classmethod
+async def is_nickname_unique(cls, session: AsyncSession, nickname: str) -> bool:
+    existing_user = await cls.get_by_nickname(session, nickname)
+    return existing_user is None

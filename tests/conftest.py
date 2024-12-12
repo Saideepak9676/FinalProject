@@ -40,6 +40,7 @@ from app.services.jwt_service import create_access_token
 
 
 
+
 fake = Faker()
 
 settings = get_settings()
@@ -329,7 +330,31 @@ def user_response_data():
 def login_request_data():
     return {"email": "john_doe@example.com", "password": "SecurePassword123!"}
 
+############################
+# tests/conftest.py
+
+import pytest
+from httpx import AsyncClient
+from app.main import app  # Replace with your FastAPI app's entry point
+from app.database import Database  # Adjust the import based on your database setup
 
 
+@pytest.fixture
+async def client():
+    """Fixture to provide an HTTP client for testing."""
+    # Initialize the database
+    Database.initialize("sqlite+aiosqlite:///./test.db", echo=True)  # Replace with your test DB URL
 
+    # Override dependencies if necessary
+    def override_get_db():
+        session_factory = Database.get_session_factory()
+        try:
+            db = session_factory()
+            yield db
+        finally:
+            db.close()
 
+    app.dependency_overrides["get_db"] = override_get_db
+
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
