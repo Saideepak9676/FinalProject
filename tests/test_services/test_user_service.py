@@ -15,6 +15,7 @@ from app.schemas.user_schemas import UserCreate, UserUpdate
 from app.utils.security import validate_password
 from app.utils.security import hash_password, verify_password
 from unittest.mock import patch
+from app.services.user_service import UserService
 
 
 
@@ -339,6 +340,8 @@ async def test_user_creation_with_valid_password(db_session: AsyncSession, email
     assert created_user.hashed_password is not None
 
 
+
+
 @pytest.mark.asyncio
 async def test_user_creation_with_invalid_password(db_session: AsyncSession, email_service: AsyncMock):
     user_data = {
@@ -382,5 +385,15 @@ async def test_reset_password_for_nonexistent_user(db_session):
     assert success is False, "Reset should fail for non-existent users"
     
     
-    
+@pytest.mark.asyncio
+async def test_create_user_with_duplicate_nickname(db_session: AsyncSession, email_service, user):
+    """Test user creation with a duplicate nickname fails."""
+    user_data = {
+        "email": "newuser@example.com",
+        "password": "SecurePassword123!",
+        "nickname": user.nickname  # Use an existing nickname
+    }
+
+    result = await UserService.create(db_session, user_data, email_service)
+    assert result is None, "Creation should fail for duplicate nickname."
 
