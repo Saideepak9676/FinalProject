@@ -16,6 +16,8 @@ from app.utils.security import validate_password
 from app.utils.security import hash_password, verify_password
 from unittest.mock import patch
 from app.services.user_service import UserService
+from uuid import uuid4
+
 
 
 
@@ -274,8 +276,13 @@ async def test_update_user_with_duplicate_nickname(db_session: AsyncSession, use
         "nickname": another_user.nickname  # Use an existing nickname
     }
 
-    result = await UserService.update(db_session, user.id, updated_data)
-    assert result is None, "Update should fail for duplicate nickname."
+    # Expecting an HTTPException due to duplicate nickname
+    with pytest.raises(HTTPException) as exc_info:
+        result = await UserService.update(db_session, user.id, updated_data)
+    
+    # Assert the exception details
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Nickname already exists."
 
 
 @pytest.mark.asyncio
@@ -441,3 +448,38 @@ async def test_second_user_default_role(db_session, email_service):
     assert second_user.role == UserRole.AUTHENTICATED, "Second user should have AUTHENTICATED role."
 
 
+@pytest.mark.asyncio
+async def test_user_service_update_bio(db_session, user):
+    """
+    Test that the UserService.update method updates a user's bio.
+    """
+    new_bio = "Updated bio for testing."
+    updated_user = await UserService.update(db_session, user.id, {"bio": new_bio})
+
+    assert updated_user is not None
+    assert updated_user.bio == new_bio
+
+@pytest.mark.asyncio
+async def test_user_service_update_nonexistent_user(db_session):
+    """
+    Test that updating a non-existent user returns None.
+    """
+    fake_user_id = uuid4()
+    updated_user = await UserService.update(db_session, fake_user_id, {"bio": "Non-existent user bio."})
+
+    assert updated_user is None
+
+@pytest.mark.asyncio
+async def test_user_service_update_invalid_bio(db_session, user):
+    """
+    Test that UserService.update rejects invalid bio data.
+    """
+    long_bio = "a" * 501  # 501 characters
+
+    # Expecting an HTTPException due to invalid bio length
+    with pytest.raises(HTTPException) as exc_info:
+        await UserService.update(db_session, user.id, {"bio": long_bio})
+    
+    # Assert the exception details
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail == "Bio exceeds maximum length of 500 characters."
