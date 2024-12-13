@@ -602,3 +602,81 @@ async def test_login_unexpected_error(mocker):
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail == "An unexpected error occurred."
+    
+
+@pytest.mark.asyncio
+async def test_update_user_bio_valid(async_client, admin_user, admin_token):
+    """
+    Test updating a user's bio with valid data.
+    """
+    auth_headers = {"Authorization": f"Bearer {admin_token}"}
+    new_bio = {"bio": "A new, valid bio that is less than 500 characters."}
+
+    response = await async_client.patch(
+        f"/users/{admin_user.id}/bio",
+        json=new_bio,
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["bio"] == new_bio["bio"]
+
+
+import pytest
+
+@pytest.mark.asyncio
+async def test_update_user_bio_exceeds_max_length(async_client, admin_user, admin_token):
+    """
+    Test that updating a bio with more than 500 characters fails.
+    """
+    auth_headers = {"Authorization": f"Bearer {admin_token}"}
+    long_bio = {"bio": "a" * 501}  # 501 characters
+
+    response = await async_client.patch(
+        f"/users/{admin_user.id}/bio",
+        json=long_bio,
+        headers=auth_headers,
+    )
+
+    # Expecting 422 due to Pydantic validation
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["msg"] == "String should have at most 500 characters"
+
+
+@pytest.mark.asyncio
+async def test_update_user_bio_missing_field(async_client, admin_user, admin_token):
+    """
+    Test that updating a user bio fails if the bio field is missing.
+    """
+    auth_headers = {"Authorization": f"Bearer {admin_token}"}
+    invalid_payload = {}  # No "bio" field
+
+    response = await async_client.patch(
+        f"/users/{admin_user.id}/bio",
+        json=invalid_payload,
+        headers=auth_headers,
+    )
+
+    # Expecting 422 due to Pydantic missing field validation
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["msg"] == "Field required"  # Corrected capitalization
+
+
+
+@pytest.mark.asyncio
+async def test_update_user_bio_unauthorized(async_client, user_token, admin_user):
+    """
+    Test that unauthorized users cannot update a bio.
+    """
+    auth_headers = {"Authorization": f"Bearer {user_token}"}
+    new_bio = {"bio": "Unauthorized attempt to update bio."}
+
+    response = await async_client.patch(
+        f"/users/{admin_user.id}/bio",
+        json=new_bio,
+        headers=auth_headers,
+    )
+
+    # Unauthorized users should get a 403 response
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Operation not permitted"

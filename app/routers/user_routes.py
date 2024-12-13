@@ -39,6 +39,8 @@ from datetime import datetime
 from app.utils.pagination import generate_pagination_links
 from app.schemas.user_schemas import UpdateProfilePictureRequest
 import logging
+from app.schemas.user_schemas import UpdateBioRequest
+
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -333,17 +335,17 @@ async def update_user_profile_picture(
 @router.patch("/users/{user_id}/bio", response_model=UserResponse, name="update_user_bio", tags=["User Profile"])
 async def update_user_bio(
     user_id: UUID,
-    bio_data: dict,
+    bio_data: UpdateBioRequest,  # Use the schema
     db: AsyncSession = Depends(get_db),
     token: str = Depends(oauth2_scheme),
     current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
 ):
-    if not bio_data.get("bio"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bio field is required.")
-    
-    updated_user = await UserService.update(db, user_id, {"bio": bio_data["bio"]})
+    """
+    Update the user's bio.
+    """
+    # Update the user bio using the validated schema
+    updated_user = await UserService.update(db, user_id, {"bio": bio_data.bio})  # Access `bio` directly from the schema
     if not updated_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    # Exclude updated_at from the returned response
     return UserResponse.model_validate(updated_user)
