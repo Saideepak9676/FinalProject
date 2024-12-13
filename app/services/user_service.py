@@ -60,8 +60,15 @@ class UserService:
     @classmethod
     async def create(cls, session: AsyncSession, user_data: Dict[str, str], email_service: EmailService) -> Optional[User]:
         try:
-           # Set default role if not provided
-           user_data.setdefault("role", UserRole.AUTHENTICATED.name)
+           # Check if the user is the first user
+           is_first_user = await cls.is_first_user(session)
+           logger.debug(f"is_first_user: {is_first_user}")  # Debug statement
+           if is_first_user:
+               user_data["role"] = UserRole.ADMIN.name  # Automatically assign ADMIN role
+           else:
+               # Set default role if not provided
+               user_data.setdefault("role", UserRole.AUTHENTICATED.name)
+           logger.debug(f"Assigned role: {user_data['role']}")
            validated_data = UserCreate(**user_data).model_dump()
 
            # Check for existing email
@@ -94,11 +101,15 @@ class UserService:
 
            # Prepare new user
            new_user = User(**validated_data)
+           
+           # Assign role explicitly based on whether it’s the first user
+           new_user.role = UserRole.ADMIN if is_first_user else UserRole.AUTHENTICATED
 
            # Add and commit new user
            new_user.verification_token = generate_verification_token()
            session.add(new_user)
            await session.commit()
+           await session.refresh(new_user)  # Ensure in-memory reflects database state
 
            # Send verification email
            await email_service.send_verification_email(new_user)
@@ -111,6 +122,14 @@ class UserService:
             logger.error(f"Unexpected error during user creation: {e}")
             return None
 
+    @classmethod
+    async def is_first_user(cls, session: AsyncSession) -> bool:
+       """Check if the current user is the first user in the database."""
+       query = select(func.count()).select_from(User)
+       result = await session.execute(query)
+       count = result.scalar()  # Ensure count is an integer
+       logger.debug(f"User count in database: {count}")
+       return count == 0
 
     @classmethod
     async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str]) -> Optional[User]:
@@ -308,3 +327,5 @@ def generate_unique_nickname(session) -> str:
 async def is_nickname_unique(cls, session: AsyncSession, nickname: str) -> bool:
     existing_user = await cls.get_by_nickname(session, nickname)
     return existing_user is None
+
+
