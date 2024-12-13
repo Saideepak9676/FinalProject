@@ -396,4 +396,48 @@ async def test_create_user_with_duplicate_nickname(db_session: AsyncSession, ema
 
     result = await UserService.create(db_session, user_data, email_service)
     assert result is None, "Creation should fail for duplicate nickname."
+    
+@pytest.mark.asyncio
+async def test_first_user_becomes_admin(db_session, email_service):
+    """Verify that the first user automatically becomes an admin."""
+    # Create the first user
+    user_data = {
+        "nickname": "first_user",
+        "email": "first@example.com",
+        "password": "StrongPassword123!"
+    }
+    first_user = await UserService.create(db_session, user_data, email_service)
+
+    # Check if the user was created
+    assert first_user is not None, "The first user was not created."
+
+    # Verify the role of the created user
+    assert first_user.role == UserRole.ADMIN, f"Expected role 'ADMIN', but got {first_user.role}."
+
+    # Fetch the user directly from the database to verify persistence
+    persisted_user = await UserService.get_by_email(db_session, user_data["email"])
+    assert persisted_user is not None, "The first user was not persisted in the database."
+    assert persisted_user.role == UserRole.ADMIN, f"Expected persisted role 'ADMIN', but got {persisted_user.role}."
+
+
+
+@pytest.mark.asyncio
+async def test_second_user_default_role(db_session, email_service):
+    """Verify that subsequent users are assigned the default AUTHENTICATED role."""
+    # Create first user (admin)
+    await UserService.create(
+        db_session,
+        {"nickname": "first_user", "email": "first@example.com", "password": "StrongPassword123!"},
+        email_service,
+    )
+    
+    # Create second user
+    user_data = {
+        "nickname": "second_user",
+        "email": "second@example.com",
+        "password": "StrongPassword123!"
+    }
+    second_user = await UserService.create(db_session, user_data, email_service)
+    assert second_user.role == UserRole.AUTHENTICATED, "Second user should have AUTHENTICATED role."
+
 

@@ -294,6 +294,42 @@ This enhancement is a pivotal step forward in ensuring the robustness and reliab
 For more details, review the specific files and tests updated as part of this enhancement.        
 
 
+# issue: Automatically Assign Admin Role to First Registered User        
+## Enhancement:        
+This enhancement ensures that the first user to register in the application is automatically assigned the ADMIN role. This functionality streamlines the initialization process by eliminating the need for manual configuration or updates to grant admin privileges for the first user.           
+
+## Key Features of This Issue         
+1. Automatic Role Assignment: The first user created in the system is assigned the ADMIN role by default, while all subsequent users retain the AUTHENTICATED role.              
+2. Database Integrity: Ensures that roles are correctly assigned and persisted in the database with no manual intervention.          
+3. Customizable Roles: Utilizes existing role definitions (UserRole) to handle both ADMIN and AUTHENTICATED roles seamlessly.        
+4. Backward Compatibility: Maintains existing functionality for user creation, allowing customization and additional roles in the future.           
+
+## Benefits:       
+1. Simplified Setup: Reduces the manual steps needed during the initial configuration of the application by automatically assigning the administrator role.          
+2. Secure Role Management: Ensures the first user always has the required administrative privileges, improving role integrity.          
+3. Improved Developer Experience: Offers clarity and consistency when managing user roles during the development and testing phases.            
+4. Ease of Use: For end-users and administrators, the setup is straightforward, reducing the chance of misconfiguration.           
+
+## Expected Outcome       
+1. Upon registering the first user, the application will automatically assign the ADMIN role to that user.         
+2. All subsequent users will have the default role AUTHENTICATED, unless explicitly updated later.          
+3. Role assignment logic is encapsulated within the UserService.create method, ensuring consistent behavior across all user creation pathways.      
+4. Updated unit tests validate this behavior, guaranteeing that the logic works as expected during all edge cases.             
+
+## Files Updated for Implementing This Issue          
+1. user_service.py           
+- Added logic in the UserService.create method to check if the user is the first in the database using the is_first_user method.          
+- Updated role assignment logic to assign ADMIN to the first user.          
+2. user_model.py          
+- Ensured the role column uses an Enum to define roles (ADMIN and AUTHENTICATED) with a default value of AUTHENTICATED.             
+3. test_user_service.py          
+- Added/Updated tests to validate the following scenarios:
+   - The first user is assigned the ADMIN role.         
+   - All subsequent users are assigned the AUTHENTICATED role           
+
+
+
+
 
 
 
