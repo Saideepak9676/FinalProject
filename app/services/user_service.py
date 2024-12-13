@@ -136,12 +136,31 @@ class UserService:
         try:
             validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
 
+            # Field-specific validations
+            if "bio" in validated_data and len(validated_data["bio"]) > 500:
+                logger.error("Bio exceeds maximum length of 500 characters.")
+                raise HTTPException(
+                status_code=422,
+                detail="Bio exceeds maximum length of 500 characters."
+                )
+                
+            if "profile_picture_url" in validated_data and not validated_data["profile_picture_url"]:
+                logger.error("Profile picture URL cannot be empty.")
+                raise HTTPException(
+                status_code=400,
+                detail="Profile picture URL is invalid or empty."
+            )    
+            
+            
             # Check for nickname uniqueness if nickname is being updated
             if "nickname" in validated_data:
                 existing_nickname = await cls.get_by_nickname(session, validated_data["nickname"])
                 if existing_nickname and existing_nickname.id != user_id:
                     logger.error("User with given nickname already exists.")
-                    return None
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Nickname already exists."
+                    )
 
             # Hash the password if being updated
             if 'password' in validated_data:
@@ -151,6 +170,7 @@ class UserService:
             query = update(User).where(User.id == user_id).values(**validated_data).execution_options(synchronize_session="fetch")
             await cls._execute_query(session, query)
 
+            # Retrieve the updated user
             updated_user = await cls.get_by_id(session, user_id)
             if updated_user:
                 session.refresh(updated_user)  # Explicitly refresh the updated user object
@@ -160,8 +180,10 @@ class UserService:
             logger.error(f"User {user_id} not found after update attempt.")
             return None
 
+        except HTTPException:
+            raise  # Re-raise known HTTP exceptions
         except Exception as e:
-            logger.error(f"Error during user update: {e}")
+            logger.error(f"Unexpected error during user update: {e}")
             return None
 
     @classmethod
