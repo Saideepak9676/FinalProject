@@ -206,12 +206,13 @@ async def admin_user(db_session: AsyncSession):
         email="admin@example.com",
         first_name="John",
         last_name="Doe",
-        hashed_password="securepassword",
+        hashed_password=hash_password("ValidPassword123!"),
         role=UserRole.ADMIN,
         is_locked=False,
     )
     db_session.add(user)
     await db_session.commit()
+    await db_session.refresh(user)
     return user
 
 @pytest.fixture
