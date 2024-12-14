@@ -483,3 +483,25 @@ async def test_user_service_update_invalid_bio(db_session, user):
     # Assert the exception details
     assert exc_info.value.status_code == 422
     assert exc_info.value.detail == "Bio exceeds maximum length of 500 characters."
+    
+@pytest.mark.asyncio
+async def test_login_user_success(db_session, verified_user):
+    """
+    Test successful login using UserService.
+    """
+    # Extracting user from the fixture
+    user = verified_user
+
+    # Use the email and password from the fixture
+    email = user.email
+    password = "MySuperPassword$1234"  # This matches the password in the fixture
+
+    # Call the login_user method
+    result = await UserService.login_user(db_session, email, password)
+
+    # Validate the result
+    assert result is not None, "Expected login_user to return a user but got None"
+    assert result.email == email, "Email mismatch in the returned user object"
+    assert result.nickname == user.nickname, "Nickname mismatch in the returned user object"
+
+

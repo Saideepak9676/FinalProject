@@ -20,6 +20,8 @@ from app.schemas.token_schema import TokenResponse
 from app.models.user_model import UserRole
 from datetime import timedelta
 from app.utils.security import hash_password
+from sqlalchemy.future import select
+
 
 fake = Faker()
 
@@ -680,3 +682,60 @@ async def test_update_user_bio_unauthorized(async_client, user_token, admin_user
     # Unauthorized users should get a 403 response
     assert response.status_code == 403
     assert response.json()["detail"] == "Operation not permitted"
+    
+    
+@pytest.mark.asyncio
+async def test_login_success(async_client, db_session):
+    """
+    Test successful login for an admin user.
+    """
+    # Ensure the admin user exists in the database
+    admin_user_data = {
+        "nickname": "admin",
+        "email": "admin@example.com",
+        "hashed_password": hash_password("ValidPassword123!"),
+        "role": UserRole.ADMIN,
+        "email_verified": True,
+        "is_locked": False,
+    }
+    admin_user = User(**admin_user_data)
+    db_session.add(admin_user)
+    await db_session.commit()
+    await db_session.refresh(admin_user)
+
+    print(f"Admin user in DB: {admin_user}")
+    print(f"Hashed password: {admin_user.hashed_password}")
+
+    # Use the credentials of the admin user
+    login_data = {"username": "admin@example.com", "password": "ValidPassword123!"}
+    response = await async_client.post(
+        "/login/",
+        data=urlencode(login_data),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+
+    print("Response status code:", response.status_code)
+    print("Response body:", response.json())
+
+    assert response.status_code == 200, f"Unexpected status code: {response.status_code}"
+    assert "access_token" in response.json(), "Access token not found in response"
+
+
+
+
+
+@pytest.mark.asyncio
+async def test_login_invalid_credentials(async_client):
+    """
+    Test login with incorrect credentials.
+    """
+    # Prepare invalid credentials
+    login_data = {"username": "invalid@example.com", "password": "WrongPassword123!"}
+    response = await async_client.post(
+        "/login/",
+        data=urlencode(login_data),
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    assert response.status_code == 401
+    assert "Incorrect email or password" in response.json()["detail"]
+
