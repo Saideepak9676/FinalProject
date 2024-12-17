@@ -1,11 +1,11 @@
-# User Management System with Analytics 🚀
+# User Management System with Analytics 
 
-## 🌟 Epic Project Overview
+##  Epic Project Overview
 A sophisticated user management system built with FastAPI and SQLAlchemy, featuring advanced analytics, comprehensive testing, and seamless CI/CD integration. This project represents the culmination of software engineering best practices and modern development techniques.
 
-## 🎯 Core Features
+##  Core Features
 
-### 1. User Analytics System 📊
+### 1. User Analytics System 
 - **Event Tracking**
   - Comprehensive user activity monitoring
   - Session-based analytics
@@ -24,7 +24,7 @@ A sophisticated user management system built with FastAPI and SQLAlchemy, featur
   - Role-based activity analysis
   - Historical activity tracking
 
-### 2. Advanced User Management 👥
+### 2. Advanced User Management 
 - **Role Management**
   - Automatic admin role assignment for first user
   - Role-based access control (RBAC)
@@ -43,7 +43,7 @@ A sophisticated user management system built with FastAPI and SQLAlchemy, featur
   - URL-safe username generation
   - Profile customization options
 
-## 🧪 Test Suite
+##  Test Suite
 
 ### Analytics Service Tests
 1. `test_track_event`
@@ -107,7 +107,7 @@ A sophisticated user management system built with FastAPI and SQLAlchemy, featur
     - Unlock mechanisms
     - Security compliance
 
-## 🛠️ Quality Assurance and reolved issues
+##  Quality Assurance and reolved issues
 
 ### 1. [Docker Compose Build Error](https://github.com/Saideepak9676/FinalProject/issues/1)
 - Fixed package version constraints
@@ -139,7 +139,7 @@ A sophisticated user management system built with FastAPI and SQLAlchemy, featur
 - Duplicate prevention
 - Data integrity assurance
 
-## 🚀 Deployment
+##  Deployment
 
 ### Docker Integration
 Build the image: docker-compose build
@@ -152,7 +152,7 @@ docker-compose exec fastapi pytest
 - Latest build status: [![Build Status](badge_url)](build_status_url)
 - Security scan: [![Security Status](security_badge_url)](security_status_url)
 
-## 💻 Development Process
+##  Development Process
 
 ### Version Control
 - Git workflow implementation
@@ -172,7 +172,7 @@ docker-compose exec fastapi pytest
 - Style guide enforcement
 - Performance optimization
 
-## 📚 Documentation
+##  Documentation
 
 ### API Documentation
 - Swagger UI integration
@@ -180,6 +180,6 @@ docker-compose exec fastapi pytest
 - Request/response examples
 - Authentication details
 
-## 📞 Contact
+## Links
 - Project Link: [https://github.com/Saideepak9676/FinalProject](https://github.com/Saideepak9676/FinalProject)
 - DockerHub: [saideepak9676/finalproject](https://hub.docker.com/r/saideepak9676/finalproject)
