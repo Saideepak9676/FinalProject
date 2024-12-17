@@ -157,9 +157,9 @@ A sophisticated user management system built with FastAPI and SQLAlchemy, featur
 ##  Deployment
 
 ### Docker Integration
-Build the image: docker-compose build
-Run the container: docker-compose up -d
-docker-compose exec fastapi pytest
+- Build the image: docker-compose build
+- Run the container: docker-compose up -d
+- docker-compose exec fastapi pytest
 
 
 ### DockerHub Repository
