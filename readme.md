@@ -149,11 +149,9 @@ docker-compose exec fastapi pytest
 
 ### DockerHub Repository
 - Repository: [saideepak9676/finalproject](https://hub.docker.com/r/saideepak9676/finalproject)
-- Latest build status: [![Build Status](badge_url)](build_status_url)
-- Security scan: [![Security Status](security_badge_url)](security_status_url)
 
 ### Docker Image
-- [image!](https://github.com/Saideepak9676/FinalProject/blob/main/Docker%20Final%20project.jpg)
+- ![image](https://github.com/Saideepak9676/FinalProject/blob/main/Docker%20Final%20project.jpg)
 
 ##  Development Process
 
@@ -185,4 +183,15 @@ docker-compose exec fastapi pytest
 
 ## Links
 - Project Link: [https://github.com/Saideepak9676/FinalProject](https://github.com/Saideepak9676/FinalProject)
-- DockerHub: [saideepak9676/finalproject](https://hub.docker.com/r/saideepak9676/finalproject)
+- DockerHub: [saideepak9676/finalproject]([https://hub.docker.com/r/saideepak9676/finalproject])
+
+## Learning reflections from course:
+-Learned how to use Git to track code changes and manage project versions.
+-Used GitHub or GitLab for team collaboration, reviewing code through pull requests and merge requests.
+-Set up CI pipelines to automatically test code whenever changes are made, ensuring code quality and stability.
+-Configured CD pipelines to automatically deploy applications to production after passing tests.
+-Wrote YAML files to define CI/CD pipelines, automating the build, test, and deploy process.
+-Learned how to containerize applications using Docker to create consistent development and production environments.
+-Used Docker in CI/CD pipelines to build, test, and deploy containerized applications.
+-Deployed web apps to cloud platforms like Heroku, AWS, and Netlify with Docker for easier management.
+
