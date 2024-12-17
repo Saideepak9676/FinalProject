@@ -164,7 +164,7 @@ A sophisticated user management system built with FastAPI and SQLAlchemy, featur
 
 ### DockerHub Repository
 - Repository: [saideepak9676/finalproject](https://hub.docker.com/r/saideepak9676/finalproject)
-- DockerHub general: [saideepak9676/finalproject](https://hub.docker.com/r/saideepak9676/finalproject)
+- DockerHub general: [saideepak9676/finalproject](https://hub.docker.com/repository/docker/saideepak9676/finalproject/general)
 
 ### Docker Image
 - ![image](https://github.com/Saideepak9676/FinalProject/blob/main/Docker%20image.jpg)
