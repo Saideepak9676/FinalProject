@@ -152,6 +152,9 @@ docker-compose exec fastapi pytest
 - Latest build status: [![Build Status](badge_url)](build_status_url)
 - Security scan: [![Security Status](security_badge_url)](security_status_url)
 
+### Docker Image
+- [Link](https://github.com/Saideepak9676/FinalProject/blob/main/Docker%20Final%20project.jpg)
+
 ##  Development Process
 
 ### Version Control
