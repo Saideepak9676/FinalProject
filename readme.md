@@ -1,6 +1,6 @@
 # User Management System with Analytics 
 
-##  Epic Project Overview
+##  Project Overview
 A sophisticated user management system built with FastAPI and SQLAlchemy, featuring advanced analytics, comprehensive testing, and seamless CI/CD integration. This project represents the culmination of software engineering best practices and modern development techniques.
 
 ##  Core Features
@@ -138,6 +138,21 @@ A sophisticated user management system built with FastAPI and SQLAlchemy, featur
 - Nickname uniqueness checks
 - Duplicate prevention
 - Data integrity assurance
+
+##  Feature added:
+
+### User Retention Analytics
+- Event Tracking: Tracks user activities, whether they are logged in or anonymous, and stores details for later analysis.
+- Conversion Rate Tracking: Monitors how many anonymous users convert to authenticated users and calculates conversion rates over time.
+- User Activity Monitoring: Tracks user logins and frequency, helping identify inactive users and measure engagement.
+- Data Model: Creates an optimized database to store user interactions, designed for fast data analysis.
+- Role Change Tracking: Records when users change roles, allowing you to understand their progression over time.
+- Testing Framework: Ensures the system is reliable with thorough tests for data accuracy, reliability, and performance.
+- Session Management: Links user actions across different sessions to analyze their entire journey.
+- Time-Based Analysis: Allows for analyzing historical data and spotting trends over time, while considering different time zones.
+- Error Handling: Manages errors to protect data integrity and ensures transactions are handled properly.
+- User Integration: Works smoothly with user management systems, maintaining relationships and supporting automatic updates.
+
 
 ##  Deployment
 
